@@ -3,9 +3,8 @@
 A calm study and course companion for college students with ADHD. The guiding
 constraint: **the app should never show you everything at once.**
 
-This is the first slice — project setup, the navigation shell, the Focus
-dashboard, and course management. Syllabus parsing, task breakdown with a
-Pomodoro timer, and the read-aloud reader come next.
+Everything runs in the browser. Documents are parsed on the device and never
+uploaded anywhere.
 
 ## Running it
 
@@ -15,78 +14,77 @@ npm run dev      # http://localhost:3000
 npm run build    # production build
 npm run lint     # eslint
 npm run typecheck
+npm test         # node:test — sentence splitting, PDF line merging, breakdown
 ```
 
-## What works today
+## What it does
 
-- **Navigation shell** — sidebar on desktop, drawer on mobile, one quiet
-  header, skip-to-content link, full keyboard support.
-- **Focus dashboard** (`/`) — a single "Next up" card, an "Also today" list
-  only when there is more than one thing, quick capture, and a "Done today"
-  section where completions land.
-- **Courses** (`/courses`) — add, edit and delete courses with a colour and
-  icon; each course gets a detail page with its tasks and a quick-add.
-- **Dark / light mode** — set before first paint, so there is no flash.
-- **Local persistence** — everything is stored in `localStorage` behind a
-  `DataStore` interface, so a Supabase adapter can be dropped in without
-  touching a single component.
+**Courses** (`/courses`) — add, edit and delete courses with a colour and
+icon. Each course has a detail page holding its tasks, its syllabus, and its
+readings.
 
-`/tasks` and `/reader` are routed and reachable but state plainly what is
-still being built rather than showing shells that look interactive.
+**Documents** — drag and drop `.pdf`, `.docx`, `.txt` or `.md` onto a course
+page and the file is bound to that course as it is parsed. Text extraction is
+client-side: `pdfjs-dist` for PDFs (rejoining lines that wrapped at the page
+margin), `mammoth` for Word, a plain read for text. The library at `/reader`
+groups everything by course and filters by course, file type and sort order;
+any row can be refiled into a different course without leaving the page.
+
+**Read-aloud reader** (`/reader/[id]`) — a distraction-free pane with play,
+pause, stop, sentence skip and 0.75×–2× speed, built on `speechSynthesis`.
+The sentence being spoken is highlighted, the word within it is underlined
+where the browser reports boundary events, and the page follows along. Click
+any sentence to read from there. Your position is remembered per document.
+
+**Tasks** (`/tasks`) — the full list, grouped by when work is due, with
+anything past this week collapsed. "Break into steps" turns an assignment
+into micro-steps from a template matched to its title; the steps are editable
+before they are added, and the first unfinished one is the only one
+emphasised.
+
+**Focus mode** — from the Focus dashboard, one task fills the screen with its
+next step and a Pomodoro timer, and nothing else. Completed focus blocks are
+counted against the task.
+
+**Throughout** — dark/light mode applied before first paint, keyboard support
+everywhere, motion that respects `prefers-reduced-motion`, and persistence in
+IndexedDB behind a `DataStore` interface.
 
 ## File tree
 
 ```
 adhd-hw/
-├── eslint.config.mjs
-├── next.config.ts
-├── postcss.config.mjs
-├── tsconfig.json
 └── src/
     ├── app/
-    │   ├── layout.tsx              # root layout: providers + AppShell
-    │   ├── globals.css             # design tokens, base styles, animations
-    │   ├── icon.svg
-    │   ├── not-found.tsx
-    │   ├── page.tsx                # Focus dashboard
-    │   ├── courses/
-    │   │   ├── page.tsx
-    │   │   └── [courseId]/page.tsx
-    │   ├── reader/page.tsx
+    │   ├── layout.tsx                  # providers + AppShell
+    │   ├── globals.css                 # design tokens, base styles, animations
+    │   ├── page.tsx                    # Focus dashboard
+    │   ├── courses/[courseId]/page.tsx
+    │   ├── reader/page.tsx             # library
+    │   ├── reader/[documentId]/page.tsx
     │   └── tasks/page.tsx
     ├── components/
-    │   ├── layout/
-    │   │   ├── AppShell.tsx        # the main layout component
-    │   │   ├── Sidebar.tsx
-    │   │   ├── TopBar.tsx
-    │   │   ├── MobileNavDrawer.tsx
-    │   │   ├── ThemeToggle.tsx
-    │   │   └── navigation.ts       # nav items, shared by sidebar + drawer
-    │   ├── courses/
-    │   │   ├── CourseCard.tsx
-    │   │   ├── CourseDetail.tsx
-    │   │   ├── CourseFormDialog.tsx
-    │   │   ├── CourseGrid.tsx
-    │   │   └── CourseIcon.tsx
-    │   ├── focus/
-    │   │   ├── FocusView.tsx
-    │   │   ├── QuickAddTask.tsx
-    │   │   └── TaskRow.tsx
-    │   └── ui/
-    │       ├── Button.tsx
-    │       ├── Card.tsx
-    │       ├── ComingNext.tsx
-    │       ├── Dialog.tsx
-    │       ├── EmptyState.tsx
-    │       └── Field.tsx
+    │   ├── layout/                     # AppShell, Sidebar, TopBar, drawer,
+    │   │                               #   ThemeToggle, SaveErrorBanner
+    │   ├── courses/                    # CourseCard/Detail/FormDialog/Grid/Icon
+    │   ├── documents/                  # DocumentDropzone, DocumentRow, LibraryView
+    │   ├── reader/                     # ReaderView, ReaderControls, ReaderPane
+    │   ├── tasks/                      # TasksView, TaskCard, SubtaskList,
+    │   │                               #   BreakdownDialog
+    │   ├── focus/                      # FocusView, FocusMode, PomodoroTimer,
+    │   │                               #   QuickAddTask, TaskRow
+    │   └── ui/                         # Button, Card, Dialog, Field, EmptyState
     ├── lib/
-    │   ├── appData.tsx             # context + reducers over AppData
-    │   ├── courseStyles.ts         # course colour + icon tokens
-    │   ├── storage.ts              # DataStore interface, localStorage adapter
-    │   ├── theme.tsx               # dark/light, DOM as source of truth
-    │   └── utils.ts
-    └── types/
-        └── index.ts                # Course, Task, SubTask, StudyDocument
+    │   ├── appData.tsx                 # context + reducers over AppData
+    │   ├── storage.ts                  # DataStore interface, IndexedDB adapter
+    │   ├── speech.ts                   # useSpeechReader — the TTS controller
+    │   ├── pomodoro.ts                 # usePomodoro
+    │   ├── taskBreakdown.ts            # assignment-shape templates
+    │   ├── documents/extract.ts        # PDF / DOCX / text extraction
+    │   ├── documents/sentences.ts      # the sentence splitter
+    │   ├── theme.tsx, courseStyles.ts, utils.ts, useLatestRef.ts
+    │   └── **/__tests__/               # node:test suites for the pure logic
+    └── types/index.ts
 ```
 
 ## Design notes
@@ -106,14 +104,41 @@ A few decisions worth knowing before extending this:
   animation and all transitions.
 - **The content column is capped.** Full-bleed invites dense multi-column
   layouts, which is the failure mode this app exists to avoid.
+- **Never put two competing utilities of the same kind in one class string.**
+  `w-full` plus `w-auto`, or `p-6` plus `py-2`, resolve by stylesheet order
+  rather than by which was written last. `controlClass(size)` and `Card`'s
+  `padded` prop exist so callers choose once instead of overriding.
+- **The reader speaks one sentence per utterance.** Speaking a whole document
+  as a single utterance would be less code, but browsers report almost nothing
+  about their progress through one and Chrome truncates long utterances after
+  about fifteen seconds. Per-sentence utterances give exact highlighting,
+  working skip controls, and a natural resume point on every browser.
+- **Sentence indices are derived, never stored.** One splitter owns the
+  numbering, so a saved resume position always means the same place in the
+  text.
+- **Storage is IndexedDB, not localStorage.** A term of extracted PDF text
+  runs to megabytes; localStorage's ~5MB budget would start rejecting uploads
+  first. Existing localStorage data is migrated on first load, and a failed
+  write surfaces as a banner rather than being swallowed.
+
+## Known limits
+
+- **Scanned PDFs have no text layer.** They are rejected with a message
+  saying so rather than opening an empty reader; OCR is not implemented.
+- **PDF paragraph boundaries are approximate.** Wrapped lines are rejoined by
+  punctuation and length, since PDFs record positioned text runs rather than
+  paragraphs. Sentences are always intact, so this only affects where the
+  visual paragraph breaks fall.
+- **Syllabus dates are not extracted yet.** Uploading a syllabus files and
+  reads it; it does not populate the schedule. That is the next piece.
+- **Speech quality is the platform's.** The Web Speech API uses whatever
+  voices the operating system provides, and boundary events (the word-level
+  underline) are only reliable in Chromium.
 
 ## Next up
 
-1. Syllabus upload (drag-and-drop) and client-side PDF/DOCX parsing to extract
-   dates and grading breakdowns.
-2. Task breakdown into sub-steps, with a Pomodoro timer attached to the step
-   you are on.
-3. The read-aloud reader: `speechSynthesis` playback at 0.75x–2x with
-   sentence-level highlighting and a saved position per document.
-4. A Supabase `DataStore` adapter plus auth, so data follows the student
+1. Parsing dates and grading breakdowns out of an uploaded syllabus to
+   populate the schedule.
+2. A week view built on the extracted dates.
+3. A Supabase `DataStore` adapter plus auth, so data follows the student
    across devices.

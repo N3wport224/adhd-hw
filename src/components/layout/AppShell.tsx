@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
+import { SaveErrorBanner } from "@/components/layout/SaveErrorBanner";
 
 /**
  * The persistent frame every screen renders inside: a fixed sidebar on large
@@ -47,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-col">
         <TopBar onOpenMenu={() => setMenuOpen(true)} />
+        <SaveErrorBanner />
         <main
           id="main-content"
           tabIndex={-1}

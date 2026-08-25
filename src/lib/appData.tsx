@@ -11,7 +11,16 @@ import {
 } from "react";
 import { EMPTY_DATA, localDataStore } from "@/lib/storage";
 import { createId } from "@/lib/utils";
-import type { AppData, Course, CourseDraft, Task, TaskDraft } from "@/types";
+import type {
+  AppData,
+  Course,
+  CourseDraft,
+  StudyDocument,
+  StudyDocumentDraft,
+  SubTask,
+  Task,
+  TaskDraft,
+} from "@/types";
 
 interface AppDataValue {
   data: AppData;
@@ -23,6 +32,16 @@ interface AppDataValue {
   addTask(draft: TaskDraft): Task;
   updateTask(id: string, patch: Partial<Omit<Task, "id" | "createdAt">>): void;
   removeTask(id: string): void;
+  setSubtasks(taskId: string, subtasks: SubTask[]): void;
+  toggleSubtask(taskId: string, subtaskId: string): void;
+  addDocument(draft: StudyDocumentDraft): StudyDocument;
+  updateDocument(
+    id: string,
+    patch: Partial<Omit<StudyDocument, "id" | "createdAt">>,
+  ): void;
+  removeDocument(id: string): void;
+  /** Non-null when the last write failed — usually the disk quota. */
+  saveError: string | null;
 }
 
 const AppDataContext = createContext<AppDataValue | null>(null);
@@ -30,6 +49,7 @@ const AppDataContext = createContext<AppDataValue | null>(null);
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<AppData>(EMPTY_DATA);
   const [ready, setReady] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   // Guards the save effect so the first render never writes EMPTY_DATA over
   // whatever is already in storage.
   const loaded = useRef(false);
@@ -49,7 +69,25 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loaded.current) return;
-    void localDataStore.save(data);
+    let active = true;
+    localDataStore.save(data).then(
+      () => {
+        if (active) setSaveError(null);
+      },
+      (error: unknown) => {
+        // Documents are large enough to hit the storage quota, and silently
+        // losing an upload is worse than saying so.
+        if (!active) return;
+        setSaveError(
+          error instanceof Error && /quota|storage/i.test(error.message)
+            ? "There is no room left to save. Remove a document to free some up."
+            : "Your last change could not be saved.",
+        );
+      },
+    );
+    return () => {
+      active = false;
+    };
   }, [data]);
 
   const addCourse = useCallback((draft: CourseDraft) => {
@@ -115,18 +153,96 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setData((prev) => ({ ...prev, tasks: prev.tasks.filter((task) => task.id !== id) }));
   }, []);
 
+  const setSubtasks = useCallback((taskId: string, subtasks: SubTask[]) => {
+    setData((prev) => ({
+      ...prev,
+      tasks: prev.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, subtasks, updatedAt: new Date().toISOString() }
+          : task,
+      ),
+    }));
+  }, []);
+
+  const toggleSubtask = useCallback((taskId: string, subtaskId: string) => {
+    setData((prev) => ({
+      ...prev,
+      tasks: prev.tasks.map((task) => {
+        if (task.id !== taskId) return task;
+        const subtasks = task.subtasks.map((step) =>
+          step.id === subtaskId ? { ...step, done: !step.done } : step,
+        );
+        // Finishing the last step completes the task, and un-checking one
+        // reopens it. Making someone tick the same box twice is exactly the
+        // kind of friction that gets a tool abandoned.
+        const allDone = subtasks.length > 0 && subtasks.every((step) => step.done);
+        return {
+          ...task,
+          subtasks,
+          status: allDone ? "done" : task.status === "done" ? "in_progress" : task.status,
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+  }, []);
+
+  const addDocument = useCallback((draft: StudyDocumentDraft) => {
+    const now = new Date().toISOString();
+    const document: StudyDocument = {
+      ...draft,
+      id: createId(),
+      lastSentenceIndex: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    setData((prev) => ({ ...prev, documents: [...prev.documents, document] }));
+    return document;
+  }, []);
+
+  const updateDocument = useCallback(
+    (id: string, patch: Partial<Omit<StudyDocument, "id" | "createdAt">>) => {
+      setData((prev) => ({
+        ...prev,
+        documents: prev.documents.map((document) =>
+          document.id === id
+            ? { ...document, ...patch, updatedAt: new Date().toISOString() }
+            : document,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const removeDocument = useCallback((id: string) => {
+    setData((prev) => ({
+      ...prev,
+      documents: prev.documents.filter((document) => document.id !== id),
+    }));
+  }, []);
+
   const value = useMemo<AppDataValue>(
     () => ({
       data,
       ready,
+      saveError,
       addCourse,
       updateCourse,
       removeCourse,
       addTask,
       updateTask,
       removeTask,
+      setSubtasks,
+      toggleSubtask,
+      addDocument,
+      updateDocument,
+      removeDocument,
     }),
-    [data, ready, addCourse, updateCourse, removeCourse, addTask, updateTask, removeTask],
+    [
+      data, ready, saveError,
+      addCourse, updateCourse, removeCourse,
+      addTask, updateTask, removeTask, setSubtasks, toggleSubtask,
+      addDocument, updateDocument, removeDocument,
+    ],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
@@ -136,6 +252,14 @@ export function useAppData() {
   const value = useContext(AppDataContext);
   if (!value) throw new Error("useAppData must be used inside <AppDataProvider>");
   return value;
+}
+
+export function useDocument(documentId: string | null | undefined) {
+  const { data } = useAppData();
+  return useMemo(
+    () => data.documents.find((document) => document.id === documentId) ?? null,
+    [data.documents, documentId],
+  );
 }
 
 export function useCourse(courseId: string | null | undefined) {

@@ -28,7 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/reader",
-    label: "Reader",
+    label: "Library",
     blurb: "Readings, out loud, at your pace.",
     iconPath:
       "M12 7c-2-1.6-4.4-2-7-2v13c2.6 0 5 .4 7 2m0-13c2-1.6 4.4-2 7-2v13c-2.6 0-5 .4-7 2m0-13v13",

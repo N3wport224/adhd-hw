@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAppData } from "@/lib/appData";
 import { Button } from "@/components/ui/Button";
-import { CONTROL_CLASS } from "@/components/ui/Field";
+import { controlClass } from "@/components/ui/Field";
 import { cn } from "@/lib/utils";
 
 /**
@@ -43,7 +43,7 @@ export function QuickAddTask({ defaultCourseId }: { defaultCourseId?: string }) 
       </label>
       <input
         id="quick-add-title"
-        className={CONTROL_CLASS}
+        className={cn("w-full", controlClass())}
         value={title}
         onChange={(event) => setTitle(event.target.value)}
         placeholder="What needs doing?"
@@ -56,7 +56,7 @@ export function QuickAddTask({ defaultCourseId }: { defaultCourseId?: string }) 
         </label>
         <select
           id="quick-add-course"
-          className={cn(CONTROL_CLASS, "w-auto min-w-40 flex-1")}
+          className={cn("min-w-40 flex-1", controlClass())}
           value={courseId}
           onChange={(event) => setCourseId(event.target.value)}
         >
@@ -74,7 +74,7 @@ export function QuickAddTask({ defaultCourseId }: { defaultCourseId?: string }) 
         <input
           id="quick-add-due"
           type="date"
-          className={cn(CONTROL_CLASS, "w-auto min-w-40 flex-1")}
+          className={cn("min-w-40 flex-1", controlClass())}
           value={dueAt}
           onChange={(event) => setDueAt(event.target.value)}
         />

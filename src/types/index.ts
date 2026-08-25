@@ -81,15 +81,31 @@ export type DocumentKind = "pdf" | "docx" | "text";
 export interface StudyDocument {
   id: string;
   courseId: string | null;
+  /** Editable display name; starts as the file name without its extension. */
   title: string;
+  /** Original file name, kept so the library can show what was uploaded. */
+  fileName: string;
   kind: DocumentKind;
+  /** Size of the source file in bytes. */
+  fileSize: number;
   /** Extracted plain text, chunked into paragraphs for the read-aloud pane. */
   paragraphs: string[];
-  /** Paragraph index the reader last stopped on. */
-  lastParagraphIndex: number;
+  /** Page count for PDFs; null for formats without pages. */
+  pageCount: number | null;
+  /**
+   * Sentence index the reader last stopped on, so reopening a document
+   * resumes rather than restarting. Sentences are derived from `paragraphs`
+   * at read time by a single shared splitter, so the index stays valid.
+   */
+  lastSentenceIndex: number;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
+
+export type StudyDocumentDraft = Omit<
+  StudyDocument,
+  "id" | "createdAt" | "updatedAt" | "lastSentenceIndex"
+>;
 
 /** Everything the app persists, in one serialisable envelope. */
 export interface AppData {

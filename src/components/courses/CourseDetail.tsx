@@ -11,19 +11,30 @@ import { Button, LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CourseIcon } from "@/components/courses/CourseIcon";
 import { CourseFormDialog } from "@/components/courses/CourseFormDialog";
-import { TaskRow } from "@/components/focus/TaskRow";
 import { QuickAddTask } from "@/components/focus/QuickAddTask";
-import type { CourseDraft } from "@/types";
+import { TaskCard } from "@/components/tasks/TaskCard";
+import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
+import { DocumentDropzone } from "@/components/documents/DocumentDropzone";
+import { DocumentRow } from "@/components/documents/DocumentRow";
+import type { CourseDraft, Task } from "@/types";
 
 export function CourseDetail({ courseId }: { courseId: string }) {
-  const { data, ready, updateCourse, removeCourse, updateTask } = useAppData();
+  const { data, ready, updateCourse, removeCourse } = useAppData();
   const course = useCourse(courseId);
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
 
   const tasks = useMemo(
     () => data.tasks.filter((task) => task.courseId === courseId),
     [data.tasks, courseId],
+  );
+  const documents = useMemo(
+    () =>
+      data.documents
+        .filter((document) => document.courseId === courseId)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [data.documents, courseId],
   );
   const openTasks = tasks.filter((task) => task.status !== "done");
 
@@ -97,15 +108,13 @@ export function CourseDetail({ courseId }: { courseId: string }) {
             body="Add the next thing you actually have to do. One line is enough."
           />
         ) : (
-          <Card className="divide-y divide-[var(--color-border-soft)]">
+          <ul className="space-y-3">
             {tasks.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                onToggle={(done) => updateTask(task.id, { status: done ? "done" : "todo" })}
-              />
+              <li key={task.id}>
+                <TaskCard task={task} onBreakDown={setBreakdownTask} />
+              </li>
             ))}
-          </Card>
+          </ul>
         )}
 
         <Card>
@@ -114,12 +123,31 @@ export function CourseDetail({ courseId }: { courseId: string }) {
       </section>
 
       <section className="space-y-4">
-        <CardTitle>Syllabus &amp; documents</CardTitle>
-        <EmptyState
-          title="Uploading comes next"
-          body="This is where the syllabus drop zone and the course document library will live, feeding the schedule and the read-aloud reader."
-        />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle>Syllabus &amp; readings</CardTitle>
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            {documents.length} {documents.length === 1 ? "document" : "documents"}
+          </p>
+        </div>
+
+        {/* Bound to this course by id at the point of upload, so a file dropped
+            here can never end up filed under the wrong class. */}
+        <DocumentDropzone courseId={courseId} courseName={course.name} />
+
+        {documents.length > 0 ? (
+          <Card padded={false} className="divide-y divide-[var(--color-border-soft)] px-6">
+            {documents.map((document) => (
+              <DocumentRow key={document.id} document={document} showCourse={false} />
+            ))}
+          </Card>
+        ) : null}
       </section>
+
+      <BreakdownDialog
+        open={breakdownTask !== null}
+        task={breakdownTask}
+        onClose={() => setBreakdownTask(null)}
+      />
 
       <CourseFormDialog
         open={editing}

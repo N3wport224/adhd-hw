@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/lib/appData";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { LinkButton } from "@/components/ui/Button";
+import { Button, LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TaskRow } from "@/components/focus/TaskRow";
 import { QuickAddTask } from "@/components/focus/QuickAddTask";
+import { FocusMode } from "@/components/focus/FocusMode";
+import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
 import { daysUntil } from "@/lib/utils";
 import type { Task } from "@/types";
 
@@ -28,6 +30,8 @@ function byUrgency(a: Task, b: Task) {
 
 export function FocusView() {
   const { data, ready, updateTask } = useAppData();
+  const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
 
   const { nextUp, dueToday, laterCount, doneToday } = useMemo(() => {
     const open = data.tasks.filter((task) => task.status !== "done").sort(byUrgency);
@@ -48,6 +52,10 @@ export function FocusView() {
     };
   }, [data.tasks]);
 
+  const nextStep = nextUp?.subtasks.find((step) => !step.done) ?? null;
+  // Read from the store rather than held in state, so completing steps inside
+  // focus mode re-renders it with the task's current shape.
+  const focusTask = data.tasks.find((task) => task.id === focusTaskId) ?? null;
   const hour = new Date().getHours();
 
   return (
@@ -93,6 +101,24 @@ export function FocusView() {
                       updateTask(nextUp.id, { status: done ? "done" : "todo" })
                     }
                   />
+                </div>
+
+                {nextStep ? (
+                  <p className="rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm">
+                    <span className="text-[var(--color-ink-muted)]">Start with: </span>
+                    {nextStep.title}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-wrap gap-3">
+                  <Button variant="primary" onClick={() => setFocusTaskId(nextUp.id)}>
+                    Start a focus session
+                  </Button>
+                  {nextUp.subtasks.length === 0 ? (
+                    <Button variant="secondary" onClick={() => setBreakdownTask(nextUp)}>
+                      Break into steps
+                    </Button>
+                  ) : null}
                 </div>
               </>
             ) : (
@@ -174,6 +200,16 @@ export function FocusView() {
           className="h-40 animate-pulse rounded-[var(--radius-card)] bg-[var(--color-surface-muted)]"
         />
       )}
+
+      {focusTask ? (
+        <FocusMode task={focusTask} onExit={() => setFocusTaskId(null)} />
+      ) : null}
+
+      <BreakdownDialog
+        open={breakdownTask !== null}
+        task={breakdownTask}
+        onClose={() => setBreakdownTask(null)}
+      />
     </div>
   );
 }
