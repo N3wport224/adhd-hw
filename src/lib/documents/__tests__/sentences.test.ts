@@ -76,3 +76,18 @@ test("estimates at least one minute for any content", () => {
   assert.equal(estimateMinutes(["Short."]), 1);
   assert.equal(estimateMinutes([Array(310).fill("word").join(" ")]), 2);
 });
+
+test("keeps a leading enumerator attached to what it numbers", () => {
+  assert.deepEqual(textOf(["1. The cocktail party effect"]), [
+    "1. The cocktail party effect",
+  ]);
+  assert.deepEqual(textOf(["(2) What to read next."]), ["(2) What to read next."]);
+  assert.deepEqual(textOf(["iv. Attenuation theory"]), ["iv. Attenuation theory"]);
+});
+
+test("still splits a numbered item that contains several sentences", () => {
+  assert.deepEqual(textOf(["1. Read the chapter. Then take notes."]), [
+    "1. Read the chapter.",
+    "Then take notes.",
+  ]);
+});

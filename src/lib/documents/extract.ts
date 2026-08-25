@@ -1,4 +1,12 @@
-import type { DocumentKind, StudyDocumentDraft } from "@/types";
+import {
+  htmlBlocks,
+  markdownBlocks,
+  sizedLinesToBlocks,
+  type SizedLine,
+} from "@/lib/documents/blocks";
+import type { DocumentBlock, DocumentKind, StudyDocumentDraft } from "@/types";
+
+export { mergeWrappedLines } from "@/lib/documents/blocks";
 
 export const ACCEPTED_EXTENSIONS = [".pdf", ".docx", ".txt", ".md"] as const;
 
@@ -32,17 +40,6 @@ export function titleFromFileName(fileName: string) {
   return base.replace(/[_-]+/g, " ").trim() || fileName;
 }
 
-/**
- * Collapses runs of whitespace and drops empty entries. Extracted text is
- * full of stray newlines and double spaces from layout, and those turn into
- * audible stumbles once a screen reader or the speech synthesiser hits them.
- */
-function tidyParagraphs(blocks: string[]) {
-  return blocks
-    .map((block) => block.replace(/\s+/g, " ").trim())
-    .filter((block) => block.length > 0);
-}
-
 async function extractPdf(file: File) {
   // Loaded on demand: pdf.js is well over a megabyte, and someone who never
   // opens a PDF should never pay for it.
@@ -57,76 +54,84 @@ async function extractPdf(file: File) {
   const pdf = await loadingTask.promise;
 
   try {
-    const paragraphs: string[] = [];
+    const lines: SizedLine[] = [];
+
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       const page = await pdf.getPage(pageNumber);
       const content = await page.getTextContent();
 
-      // pdf.js emits positioned text runs, not paragraphs. Its own
-      // `hasEOL` flag marks where a visual line ended, which is the closest
-      // thing to structure the format actually preserves.
-      let line = "";
+      // pdf.js emits positioned text runs, not paragraphs. Its own `hasEOL`
+      // flag marks where a visual line ended, and the vertical scale in each
+      // run's transform is the glyph size — the only structural signal the
+      // format preserves at all.
+      let text = "";
+      const sizes = new Map<number, number>();
+
+      const flush = () => {
+        if (text.trim().length === 0) {
+          text = "";
+          sizes.clear();
+          return;
+        }
+        // The size that covered the most characters of the line, so a stray
+        // superscript cannot decide what kind of line this is.
+        let size = 0;
+        let best = -1;
+        for (const [candidate, chars] of sizes) {
+          if (chars > best) {
+            size = candidate;
+            best = chars;
+          }
+        }
+        lines.push({ text, size });
+        text = "";
+        sizes.clear();
+      };
+
       for (const item of content.items) {
         if (!("str" in item)) continue;
-        line += item.str;
-        if (item.hasEOL) {
-          paragraphs.push(line);
-          line = "";
-        }
+        text += item.str;
+        const size = Math.round(Math.abs(item.transform[3]) * 10) / 10;
+        sizes.set(size, (sizes.get(size) ?? 0) + item.str.length);
+        if (item.hasEOL) flush();
       }
-      if (line.trim()) paragraphs.push(line);
+      flush();
       page.cleanup();
     }
 
-    return { paragraphs: mergeWrappedLines(tidyParagraphs(paragraphs)), pageCount: pdf.numPages };
+    const tidied = lines
+      .map((line) => ({ ...line, text: line.text.replace(/\s+/g, " ").trim() }))
+      .filter((line) => line.text.length > 0);
+
+    return { blocks: sizedLinesToBlocks(tidied), pageCount: pdf.numPages };
   } finally {
     // Releases the pdf.js worker; without this each upload leaks one.
     await loadingTask.destroy();
   }
 }
 
-/**
- * PDF lines break at the page margin, not at the end of a thought. Rejoining
- * them matters here beyond tidiness: the reader speaks and highlights one
- * sentence at a time, and a sentence chopped across three "paragraphs" would
- * be read as three disconnected fragments.
- */
-export function mergeWrappedLines(lines: string[]) {
-  const merged: string[] = [];
-  for (const line of lines) {
-    const previous = merged[merged.length - 1];
-    const continuesPrevious =
-      previous !== undefined &&
-      // The previous line stopped mid-sentence. A colon is treated as a stop
-      // because it usually introduces a list; a semicolon is not, because it
-      // almost always sits inside one continuing sentence.
-      !/[.!?:]["')\]]?$/.test(previous) &&
-      // ...and this one is not a new heading or list item.
-      !/^[-•*•]|^\d+[.)]\s/.test(line) &&
-      previous.length > 40;
-
-    if (continuesPrevious) {
-      merged[merged.length - 1] = `${previous.replace(/-$/, "")}${
-        previous.endsWith("-") ? "" : " "
-      }${line}`;
-    } else {
-      merged.push(line);
-    }
-  }
-  return merged;
-}
-
 async function extractDocx(file: File) {
   // The browser bundle: the default entry point reaches for node built-ins.
   const mammoth = await import("mammoth/mammoth.browser.js");
   const buffer = await file.arrayBuffer();
-  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
-  return { paragraphs: tidyParagraphs(result.value.split(/\n+/)), pageCount: null };
+
+  // HTML rather than raw text: Word genuinely knows which of its paragraphs
+  // are headings and which are list items, and converting to plain text
+  // throws all of that away for no reason.
+  const result = await mammoth.convertToHtml(
+    { arrayBuffer: buffer },
+    {
+      // Word's Title and Subtitle styles are not headings by default, so a
+      // document's own title would otherwise arrive as an ordinary paragraph.
+      styleMap: ["p[style-name='Title'] => h1:fresh", "p[style-name='Subtitle'] => h2:fresh"],
+    },
+  );
+  return { blocks: htmlBlocks(result.value), pageCount: null };
 }
 
 async function extractText(file: File) {
   const raw = await file.text();
-  return { paragraphs: tidyParagraphs(raw.split(/\n\s*\n+|\n/)), pageCount: null };
+  return { blocks: markdownBlocks(raw), pageCount: null };
 }
 
 /**
@@ -149,7 +154,7 @@ export async function extractDocument(
     );
   }
 
-  let extracted: { paragraphs: string[]; pageCount: number | null };
+  let extracted: { blocks: DocumentBlock[]; pageCount: number | null };
   try {
     if (kind === "pdf") extracted = await extractPdf(file);
     else if (kind === "docx") extracted = await extractDocx(file);
@@ -161,7 +166,7 @@ export async function extractDocument(
     );
   }
 
-  if (extracted.paragraphs.length === 0) {
+  if (extracted.blocks.length === 0) {
     throw new ExtractionError(
       `No readable text in ${file.name}. Scanned pages need OCR before they can be read aloud.`,
     );
@@ -173,7 +178,10 @@ export async function extractDocument(
     fileName: file.name,
     kind,
     fileSize: file.size,
-    paragraphs: extracted.paragraphs,
+    // Both shapes are stored: the syllabus parser reads flat text, and a
+    // document imported before structure existed only ever had that.
+    paragraphs: extracted.blocks.map((block) => block.text),
+    blocks: extracted.blocks,
     pageCount: extracted.pageCount,
   };
 }

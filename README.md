@@ -30,8 +30,12 @@ margin), `mammoth` for Word, a plain read for text. The library at `/reader`
 groups everything by course and filters by course, file type and sort order;
 any row can be refiled into a different course without leaving the page.
 
-**Read-aloud reader** (`/reader/[id]`) — a distraction-free pane with play,
-pause, stop, sentence skip and 0.75×–2× speed, built on `speechSynthesis`.
+**Read-aloud reader** (`/reader/[id]`) — a distraction-free pane that keeps
+the document's own structure: headings stay headings, bullets stay bullets,
+numbered lists keep their numbers. Section skip, a collapsible outline, and a
+beat of silence before each heading so sections are audible as well as
+visible. Play, pause, stop, sentence skip and 0.75×–2× speed, built on
+`speechSynthesis`.
 The sentence being spoken is highlighted, the word within it is underlined
 where the browser reports boundary events, and the page follows along. Click
 any sentence to read from there. Your position is remembered per document.
@@ -111,6 +115,7 @@ adhd-hw/
     │   ├── syllabusCourseInfo.ts       # instructor, meeting times, office hours
     │   ├── schedule.ts                 # calendar grids, local-day grouping
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
+    │   ├── documents/blocks.ts         # headings, lists and quotes from each format
     │   ├── documents/sentences.ts      # the sentence splitter
     │   ├── theme.tsx, courseStyles.ts, utils.ts, useLatestRef.ts
     │   └── **/__tests__/               # node:test suites for the pure logic
@@ -143,6 +148,14 @@ A few decisions worth knowing before extending this:
   about their progress through one and Chrome truncates long utterances after
   about fifteen seconds. Per-sentence utterances give exact highlighting,
   working skip controls, and a natural resume point on every browser.
+- **Structure is captured at extraction, not guessed at render.** Word knows
+  its own headings and lists, Markdown marks them, and a PDF knows only that
+  some glyphs are bigger than others — so each format is brought to the same
+  block shape once, on import. Flattening everything to strings was what made
+  the reader a wall of uniform text.
+- **PDF heading thresholds are deliberately conservative.** A paragraph
+  wrongly promoted to a heading is jarring and corrupts the outline; a
+  heading left as a paragraph merely looks plain.
 - **Sentence indices are derived, never stored.** One splitter owns the
   numbering, so a saved resume position always means the same place in the
   text.
@@ -194,10 +207,11 @@ A few decisions worth knowing before extending this:
   number is above 12, in which case it can only be a day.
 - **Scanned PDFs have no text layer.** They are rejected with a message
   saying so rather than opening an empty reader; OCR is not implemented.
-- **PDF paragraph boundaries are approximate.** Wrapped lines are rejoined by
-  punctuation and length, since PDFs record positioned text runs rather than
-  paragraphs. Sentences are always intact, so this only affects where the
-  visual paragraph breaks fall.
+- **PDF structure is inferred from font size.** PDFs record positioned glyphs,
+  not documents, so a heading is recognised by being larger than the body
+  text. A document that sets everything in one size gives up its headings,
+  and wrapped lines are rejoined by punctuation and length. Word and Markdown
+  files carry real structure and are read exactly.
 - **Speech quality is the platform's.** The Web Speech API uses whatever
   voices the operating system provides, and boundary events (the word-level
   underline) are only reliable in Chromium.

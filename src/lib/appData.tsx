@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { blocksFromParagraphs } from "@/lib/documents/blocks";
 import { EMPTY_DATA, localDataStore } from "@/lib/storage";
 import { useLatestRef } from "@/lib/useLatestRef";
 import { createId } from "@/lib/utils";
@@ -312,6 +313,14 @@ export function useAppData() {
   const value = useContext(AppDataContext);
   if (!value) throw new Error("useAppData must be used inside <AppDataProvider>");
   return value;
+}
+
+/**
+ * A document's structure, synthesised for anything imported before blocks
+ * existed so the reader never has to branch on which era a document is from.
+ */
+export function documentBlocks(document: StudyDocument) {
+  return document.blocks ?? blocksFromParagraphs(document.paragraphs);
 }
 
 export function useDocument(documentId: string | null | undefined) {

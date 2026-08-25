@@ -58,6 +58,10 @@ function splitParagraph(paragraph: string) {
     if (endsWithAbbreviation(current)) continue;
     // A single initial ("J. Smith") is a name, not the end of a thought.
     if (/(?:^|\s)[A-Z]\.$/.test(current)) continue;
+    // A leading enumerator — "1.", "(2)", "iv." — numbers what follows
+    // rather than ending anything. Splitting here makes the reader say
+    // "one." and stop, before starting the heading as if it were new.
+    if (/^\(?[\divxIVX]{1,4}[.)]$/.test(current.trim())) continue;
 
     sentences.push(current.trim());
     current = "";

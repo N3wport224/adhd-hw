@@ -3,9 +3,16 @@
 import { PLAYBACK_RATES, type PlaybackRate, type SpeechReader } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 
+interface Section {
+  title: string;
+  sentenceIndex: number;
+}
+
 interface ReaderControlsProps {
   reader: SpeechReader;
   totalSentences: number;
+  /** Headings in the document; section skip appears only when there are any. */
+  sections?: Section[];
 }
 
 function ControlButton({
@@ -55,7 +62,11 @@ const Icon = ({ path, className }: { path: string; className?: string }) => (
   </svg>
 );
 
-export function ReaderControls({ reader, totalSentences }: ReaderControlsProps) {
+export function ReaderControls({
+  reader,
+  totalSentences,
+  sections = [],
+}: ReaderControlsProps) {
   const playing = reader.status === "playing";
   const unsupported = reader.status === "unsupported";
   const progress = totalSentences === 0 ? 0 : (reader.index + 1) / totalSentences;
@@ -75,6 +86,24 @@ export function ReaderControls({ reader, totalSentences }: ReaderControlsProps) 
   return (
     <div className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-5">
       <div className="flex flex-wrap items-center justify-center gap-3">
+        {/* Section skip sits outside the sentence controls: jumping a heading
+            at a time is how you navigate a long reading, and hunting for it
+            among four transport buttons defeats the point. */}
+        {sections.length > 1 ? (
+          <ControlButton
+            label="Previous section"
+            onClick={() => {
+              const previous = [...sections]
+                .reverse()
+                .find((section) => section.sentenceIndex < reader.index);
+              reader.jumpTo(previous?.sentenceIndex ?? 0);
+            }}
+            disabled={reader.index <= sections[0].sentenceIndex}
+          >
+            <Icon path="M11 6 4 12l7 6V6ZM20 6l-7 6 7 6V6Z" />
+          </ControlButton>
+        ) : null}
+
         <ControlButton
           label="Back one sentence"
           onClick={() => reader.skip(-1)}
@@ -110,6 +139,19 @@ export function ReaderControls({ reader, totalSentences }: ReaderControlsProps) 
         >
           <Icon path="M6 6l9 6-9 6V6ZM18 5v14" />
         </ControlButton>
+
+        {sections.length > 1 ? (
+          <ControlButton
+            label="Next section"
+            onClick={() => {
+              const next = sections.find((section) => section.sentenceIndex > reader.index);
+              if (next) reader.jumpTo(next.sentenceIndex);
+            }}
+            disabled={!sections.some((section) => section.sentenceIndex > reader.index)}
+          >
+            <Icon path="M13 6l7 6-7 6V6ZM4 6l7 6-7 6V6Z" />
+          </ControlButton>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">

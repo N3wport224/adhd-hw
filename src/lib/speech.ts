@@ -36,6 +36,15 @@ interface UseSpeechReaderOptions {
   initialIndex?: number;
   /** Called as playback moves, so the caller can persist the resume point. */
   onIndexChange?(index: number): void;
+  /**
+   * Milliseconds of silence to leave before a given sentence.
+   *
+   * The Web Speech API has no SSML and no way to express a pause, so the only
+   * place structure can be heard is in the gaps between utterances. A beat
+   * before a heading is what tells a listener a new section has started
+   * rather than the paragraph continuing.
+   */
+  pauseBefore?(index: number): number;
 }
 
 /**
@@ -52,6 +61,7 @@ export function useSpeechReader({
   sentences,
   initialIndex = 0,
   onIndexChange,
+  pauseBefore,
 }: UseSpeechReaderOptions): SpeechReader {
   const [status, setStatus] = useState<SpeechStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +79,9 @@ export function useSpeechReader({
   const voiceURIRef = useLatestRef(voiceURI);
   const sentencesRef = useLatestRef(sentences);
   const onIndexChangeRef = useLatestRef(onIndexChange);
+  const pauseBeforeRef = useLatestRef(pauseBefore);
+  /** Cleared whenever playback is interrupted mid-pause. */
+  const pauseTimer = useRef<number | null>(null);
   // Lets the recursive sentence-to-sentence chain call forward without
   // `speakFrom` depending on itself.
   const speakFromRef = useRef<(from: number) => void>(() => {});
@@ -95,6 +108,7 @@ export function useSpeechReader({
     return () => {
       synth.removeEventListener("voiceschanged", readVoices);
       generation.current += 1;
+      if (pauseTimer.current !== null) window.clearTimeout(pauseTimer.current);
       synth.cancel();
     };
   }, [supported]);
@@ -129,6 +143,7 @@ export function useSpeechReader({
 
       const target = Math.max(0, from);
       const token = (generation.current += 1);
+      if (pauseTimer.current !== null) window.clearTimeout(pauseTimer.current);
       synth.cancel();
 
       const utterance = new SpeechSynthesisUtterance(list[target].text);
@@ -170,9 +185,20 @@ export function useSpeechReader({
       setIndex(target);
       setCharIndex(null);
       onIndexChangeRef.current?.(target);
-      synth.speak(utterance);
+
+      const pause = pauseBeforeRef.current?.(target) ?? 0;
+      if (pause > 0) {
+        pauseTimer.current = window.setTimeout(() => {
+          // The pause is dead time during which stop, skip or a new document
+          // may have taken over; the token is what notices.
+          if (token !== generation.current) return;
+          synth.speak(utterance);
+        }, pause);
+      } else {
+        synth.speak(utterance);
+      }
     },
-    [supported, rateRef, voiceURIRef, sentencesRef, onIndexChangeRef],
+    [supported, rateRef, voiceURIRef, sentencesRef, onIndexChangeRef, pauseBeforeRef],
   );
 
   useEffect(() => {
@@ -204,6 +230,7 @@ export function useSpeechReader({
   const stop = useCallback(() => {
     if (!supported) return;
     generation.current += 1;
+    if (pauseTimer.current !== null) window.clearTimeout(pauseTimer.current);
     window.speechSynthesis.cancel();
     setStatus("idle");
     setCharIndex(null);

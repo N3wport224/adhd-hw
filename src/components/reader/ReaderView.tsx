@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useAppData, useDocument } from "@/lib/appData";
+import { documentBlocks, useAppData, useDocument } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { estimateMinutes, toSentences } from "@/lib/documents/sentences";
 import { useSpeechReader } from "@/lib/speech";
@@ -13,6 +13,87 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ReaderControls } from "@/components/reader/ReaderControls";
 import { ReaderPane } from "@/components/reader/ReaderPane";
 import type { StudyDocument } from "@/types";
+
+export interface ReaderSection {
+  title: string;
+  level: number;
+  /** The sentence the section begins at, so jumping to it starts playback there. */
+  sentenceIndex: number;
+}
+
+/**
+ * A collapsed table of contents.
+ *
+ * Long readings are where losing your place hurts most, and scrolling back to
+ * find a heading means reading everything in between. It starts closed so it
+ * costs nothing on a document nobody wants to navigate.
+ */
+function DocumentOutline({
+  sections,
+  reader,
+}: {
+  sections: ReaderSection[];
+  reader: ReturnType<typeof useSpeechReader>;
+}) {
+  const [open, setOpen] = useState(false);
+  const current = [...sections]
+    .reverse()
+    .find((section) => section.sentenceIndex <= reader.index);
+
+  return (
+    <div className="rounded-[var(--radius-card)] border border-[var(--color-border-soft)] bg-[var(--color-surface)]">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex min-h-12 w-full items-center gap-2 px-4 text-left text-sm"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className={cn(
+            "size-4 text-[var(--color-ink-muted)] transition-transform",
+            open ? "rotate-0" : "-rotate-90",
+          )}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+        <span className="font-medium">Sections</span>
+        <span className="truncate text-[var(--color-ink-muted)]">
+          {current ? current.title : `${sections.length} in this document`}
+        </span>
+      </button>
+
+      {open ? (
+        <ul className="space-y-0.5 border-t border-[var(--color-border-soft)] p-2">
+          {sections.map((section) => (
+            <li key={section.sentenceIndex}>
+              <button
+                type="button"
+                onClick={() => reader.jumpTo(section.sentenceIndex)}
+                className={cn(
+                  "block w-full truncate rounded-lg px-3 py-2 text-left text-sm transition",
+                  section.level === 1 ? "font-medium" : "",
+                  section.level === 3 ? "pl-8" : section.level === 2 ? "pl-5" : "",
+                  current?.sentenceIndex === section.sentenceIndex
+                    ? "bg-[var(--color-accent-soft)]"
+                    : "hover:bg-[var(--color-surface-muted)]",
+                )}
+              >
+                {section.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 export function ReaderView({ documentId }: { documentId: string }) {
   const { ready } = useAppData();
@@ -54,7 +135,28 @@ function DocumentReader({ document }: { document: StudyDocument }) {
 
   // Sentences are derived, never stored: one splitter owns the numbering, so a
   // saved resume index always means the same place in the text.
-  const sentences = useMemo(() => toSentences(document.paragraphs), [document.paragraphs]);
+  const blocks = useMemo(() => documentBlocks(document), [document]);
+  // Sentences are numbered per block, so `paragraphIndex` on each sentence is
+  // the index of the block it belongs to — which is what lets the pane render
+  // each group with its own structure.
+  const sentences = useMemo(
+    () => toSentences(blocks.map((block) => block.text)),
+    [blocks],
+  );
+
+  /** Where each heading starts, for the outline and the section controls. */
+  const sections = useMemo(
+    () =>
+      blocks
+        .map((block, index) => ({ block, index }))
+        .filter((entry) => entry.block.kind === "heading")
+        .map((entry) => ({
+          title: entry.block.text,
+          level: entry.block.level ?? 3,
+          sentenceIndex: sentences.find((s) => s.paragraphIndex === entry.index)?.index ?? 0,
+        })),
+    [blocks, sentences],
+  );
 
   const [startIndex] = useState(() =>
     Math.min(document.lastSentenceIndex, Math.max(sentences.length - 1, 0)),
@@ -67,10 +169,29 @@ function DocumentReader({ document }: { document: StudyDocument }) {
     pendingIndex.current = index;
   }, []);
 
+  /**
+   * A beat of silence before each heading, so sections are audible and not
+   * only visible. Kept short — long enough to hear as a break, short enough
+   * that it never feels like the reader has stopped working.
+   */
+  const pauseBefore = useCallback(
+    (index: number) => {
+      const sentence = sentences[index];
+      if (!sentence || sentence.index === 0) return 0;
+      const block = blocks[sentence.paragraphIndex];
+      if (block?.kind !== "heading") return 0;
+      // Only at the start of the heading, not between its own sentences.
+      const previous = sentences[index - 1];
+      return previous?.paragraphIndex === sentence.paragraphIndex ? 0 : 450;
+    },
+    [blocks, sentences],
+  );
+
   const reader = useSpeechReader({
     sentences,
     initialIndex: startIndex,
     onIndexChange: handleIndexChange,
+    pauseBefore,
   });
 
   useEffect(() => {
@@ -190,10 +311,17 @@ function DocumentReader({ document }: { document: StudyDocument }) {
       {/* Controls stay put while the text scrolls: hunting for pause is the
           last thing someone needs when they have lost the thread. */}
       <div className="sticky top-16 z-20 lg:top-20">
-        <ReaderControls reader={reader} totalSentences={sentences.length} />
+        <ReaderControls
+          reader={reader}
+          totalSentences={sentences.length}
+          sections={sections}
+        />
       </div>
 
+      {sections.length > 1 ? <DocumentOutline sections={sections} reader={reader} /> : null}
+
       <ReaderPane
+        blocks={blocks}
         sentences={sentences}
         activeIndex={reader.index}
         charIndex={reader.charIndex}

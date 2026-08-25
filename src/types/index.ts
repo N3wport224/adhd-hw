@@ -127,6 +127,25 @@ export type TaskDraft = Omit<
 
 export type DocumentKind = "pdf" | "docx" | "text";
 
+/** What a run of text is, structurally, rather than only what it says. */
+export type BlockKind = "heading" | "paragraph" | "listItem" | "quote";
+
+/**
+ * One structural unit of a document.
+ *
+ * Extraction used to hand back bare strings, which made a heading, a bullet
+ * and a paragraph indistinguishable — so the reader rendered a wall of
+ * uniform text and read it as one undifferentiated stream.
+ */
+export interface DocumentBlock {
+  kind: BlockKind;
+  text: string;
+  /** 1–3 for headings, deepest first; nesting depth for list items. */
+  level?: number;
+  /** The list marker as written ("1.", "•"), so numbering survives. */
+  marker?: string;
+}
+
 export interface StudyDocument {
   id: string;
   courseId: string | null;
@@ -137,8 +156,13 @@ export interface StudyDocument {
   kind: DocumentKind;
   /** Size of the source file in bytes. */
   fileSize: number;
-  /** Extracted plain text, chunked into paragraphs for the read-aloud pane. */
+  /**
+   * Extracted text, still flat. Kept because the syllabus parser reads it and
+   * because documents imported before structure existed only have this.
+   */
   paragraphs: string[];
+  /** Structured form of the same text. Absent on documents imported earlier. */
+  blocks?: DocumentBlock[];
   /** Page count for PDFs; null for formats without pages. */
   pageCount: number | null;
   /**
