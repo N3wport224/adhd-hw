@@ -13,6 +13,10 @@ interface ReaderControlsProps {
   totalSentences: number;
   /** Headings in the document; section skip appears only when there are any. */
   sections?: Section[];
+  /** Rendered below the controls when the reader opens its text settings. */
+  settingsPanel?: React.ReactNode;
+  settingsOpen?: boolean;
+  onToggleSettings?(): void;
 }
 
 function ControlButton({
@@ -66,6 +70,9 @@ export function ReaderControls({
   reader,
   totalSentences,
   sections = [],
+  settingsPanel,
+  settingsOpen = false,
+  onToggleSettings,
 }: ReaderControlsProps) {
   const playing = reader.status === "playing";
   const unsupported = reader.status === "unsupported";
@@ -84,7 +91,8 @@ export function ReaderControls({
   }
 
   return (
-    <div className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-5">
+    <div className="rounded-[var(--radius-card)] border border-[var(--color-border-soft)] bg-[var(--color-surface)]">
+      <div className="space-y-4 p-5">
       <div className="flex flex-wrap items-center justify-center gap-3">
         {/* Section skip sits outside the sentence controls: jumping a heading
             at a time is how you navigate a long reading, and hunting for it
@@ -226,6 +234,25 @@ export function ReaderControls({
           {reader.error}
         </p>
       ) : null}
+
+      {onToggleSettings ? (
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <button
+            type="button"
+            onClick={onToggleSettings}
+            aria-expanded={settingsOpen}
+            className="min-h-9 rounded-lg px-3 text-sm text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          >
+            {settingsOpen ? "Hide text settings" : "Text settings"}
+          </button>
+          <p className="hidden text-xs text-[var(--color-ink-muted)] sm:block">
+            Space to play, arrows to move, Escape to stop
+          </p>
+        </div>
+      ) : null}
+      </div>
+
+      {settingsOpen ? settingsPanel : null}
     </div>
   );
 }

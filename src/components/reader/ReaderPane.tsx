@@ -2,6 +2,12 @@
 
 import { useEffect, useRef } from "react";
 import { groupByParagraph, type Sentence } from "@/lib/documents/sentences";
+import {
+  LINE_WIDTH_CLASS,
+  TEXT_SIZE_CLASS,
+  TYPEFACE_CLASS,
+  type ReaderSettings,
+} from "@/lib/readerSettings";
 import { cn } from "@/lib/utils";
 import type { DocumentBlock } from "@/types";
 
@@ -13,6 +19,7 @@ interface ReaderPaneProps {
   charIndex: number | null;
   speaking: boolean;
   onSelectSentence(index: number): void;
+  settings: ReaderSettings;
 }
 
 /**
@@ -44,6 +51,7 @@ export function ReaderPane({
   charIndex,
   speaking,
   onSelectSentence,
+  settings,
 }: ReaderPaneProps) {
   const activeRef = useRef<HTMLSpanElement>(null);
   const groups = groupByParagraph(sentences);
@@ -121,7 +129,13 @@ export function ReaderPane({
       // Announced as a whole rather than sentence by sentence: a live region
       // here would make a screen reader fight the speech synthesiser.
       aria-label="Document text"
-      className="mx-auto max-w-[65ch] text-lg leading-[1.85]"
+      className={cn(
+        "mx-auto leading-[1.85]",
+        LINE_WIDTH_CLASS[settings.lineWidth],
+        TEXT_SIZE_CLASS[settings.textSize],
+        TYPEFACE_CLASS[settings.typeface],
+        settings.looseSpacing && "tracking-wide [word-spacing:0.16em]",
+      )}
     >
       {groups.map((group) => {
         // Sentences are numbered per block, so a group's paragraph index is

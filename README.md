@@ -35,7 +35,10 @@ the document's own structure: headings stay headings, bullets stay bullets,
 numbered lists keep their numbers. Section skip, a collapsible outline, and a
 beat of silence before each heading so sections are audible as well as
 visible. Play, pause, stop, sentence skip and 0.75×–2× speed, built on
-`speechSynthesis`.
+`speechSynthesis`. Text size, line width, typeface and letter spacing are
+adjustable next to the reading and remembered per device, and playback is
+keyboard-driven: space to play or pause, arrows to move a sentence, shift and
+arrows to move a section, escape to stop.
 The sentence being spoken is highlighted, the word within it is underlined
 where the browser reports boundary events, and the page follows along. Click
 any sentence to read from there. Your position is remembered per document.
@@ -96,7 +99,8 @@ adhd-hw/
     │   │                               #   GradingBreakdown
     │   ├── syllabus/                   # SyllabusScanner, SyllabusReviewModal
     │   ├── documents/                  # DocumentDropzone, DocumentRow, LibraryView
-    │   ├── reader/                     # ReaderView, ReaderControls, ReaderPane
+    │   ├── reader/                     # ReaderView, ReaderControls, ReaderPane,
+    │   │                               #   ReaderSettingsPanel
     │   ├── schedule/                   # ScheduleView, WeekGrid, MonthGrid,
     │   │                               #   DayPanel, TaskChip
     │   ├── tasks/                      # TasksView, TaskCard, SubtaskList,
@@ -116,6 +120,7 @@ adhd-hw/
     │   ├── schedule.ts                 # calendar grids, local-day grouping
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format
+    │   ├── readerSettings.ts           # per-device reading comfort settings
     │   ├── documents/sentences.ts      # the sentence splitter
     │   ├── theme.tsx, courseStyles.ts, utils.ts, useLatestRef.ts
     │   └── **/__tests__/               # node:test suites for the pure logic
@@ -148,6 +153,9 @@ A few decisions worth knowing before extending this:
   about their progress through one and Chrome truncates long utterances after
   about fifteen seconds. Per-sentence utterances give exact highlighting,
   working skip controls, and a natural resume point on every browser.
+- **Reading settings live next to the reading, not on a settings page.** The
+  right size and measure depend on the document and on how tired you are; a
+  preference you have to leave the page to change is one nobody changes.
 - **Structure is captured at extraction, not guessed at render.** Word knows
   its own headings and lists, Markdown marks them, and a PDF knows only that
   some glyphs are bigger than others — so each format is brought to the same

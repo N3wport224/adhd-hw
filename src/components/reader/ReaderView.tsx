@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLatestRef } from "@/lib/useLatestRef";
 import Link from "next/link";
 import { documentBlocks, useAppData, useDocument } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { estimateMinutes, toSentences } from "@/lib/documents/sentences";
 import { useSpeechReader } from "@/lib/speech";
+import { useReaderSettings } from "@/lib/readerSettings";
+import { ReaderSettingsPanel } from "@/components/reader/ReaderSettingsPanel";
 import { cn } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/Button";
 import { controlClass } from "@/components/ui/Field";
@@ -219,9 +222,72 @@ function DocumentReader({ document }: { document: StudyDocument }) {
     };
   }, [documentId, updateDocument]);
 
+  // Read through refs so the key handler is bound once rather than rebuilt on
+  // every sentence — re-registering a listener sixty times a minute is how
+  // keystrokes go missing.
+  const readerRef = useLatestRef(reader);
+  const jumpSection = useCallback(
+    (direction: number) => {
+      const ordered = direction > 0 ? sections : [...sections].reverse();
+      const next = ordered.find((section) =>
+        direction > 0
+          ? section.sentenceIndex > reader.index
+          : section.sentenceIndex < reader.index,
+      );
+      if (next) reader.jumpTo(next.sentenceIndex);
+      else if (direction < 0) reader.jumpTo(0);
+    },
+    [sections, reader],
+  );
+  const jumpSectionRef = useLatestRef(jumpSection);
+
   const course = data.courses.find((item) => item.id === document.courseId) ?? null;
   const [renaming, setRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const { settings, update, reset } = useReaderSettings();
+
+  /**
+   * Keyboard control of playback.
+   *
+   * Listening to a long reading means having both hands free and the page
+   * scrolled well away from the controls; reaching for the mouse to pause is
+   * exactly the interruption this view is meant to avoid. Typing anywhere —
+   * renaming the document, say — hands the keys back.
+   */
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      switch (event.key) {
+        case " ":
+          event.preventDefault();
+          if (readerRef.current.status === "playing") readerRef.current.pause();
+          else readerRef.current.play();
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          if (event.shiftKey) jumpSectionRef.current(1);
+          else readerRef.current.skip(1);
+          break;
+        case "ArrowLeft":
+          event.preventDefault();
+          if (event.shiftKey) jumpSectionRef.current(-1);
+          else readerRef.current.skip(-1);
+          break;
+        case "Escape":
+          readerRef.current.stop();
+          break;
+        default:
+          break;
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [readerRef, jumpSectionRef]);
 
   return (
     <div className="space-y-8">
@@ -315,6 +381,11 @@ function DocumentReader({ document }: { document: StudyDocument }) {
           reader={reader}
           totalSentences={sentences.length}
           sections={sections}
+          settingsOpen={settingsOpen}
+          onToggleSettings={() => setSettingsOpen((open) => !open)}
+          settingsPanel={
+            <ReaderSettingsPanel settings={settings} onChange={update} onReset={reset} />
+          }
         />
       </div>
 
@@ -327,6 +398,7 @@ function DocumentReader({ document }: { document: StudyDocument }) {
         charIndex={reader.charIndex}
         speaking={reader.status === "playing"}
         onSelectSentence={(index) => reader.jumpTo(index)}
+        settings={settings}
       />
     </div>
   );
