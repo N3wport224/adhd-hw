@@ -21,6 +21,13 @@ export const NAV_ITEMS: NavItem[] = [
     iconPath: "M6.5 3H19v18H6.5A2.5 2.5 0 0 1 4 18.5v-13A2.5 2.5 0 0 1 6.5 3Zm0 13H19M8 7h7",
   },
   {
+    href: "/schedule",
+    label: "Schedule",
+    blurb: "Everything due, week by week.",
+    iconPath:
+      "M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Zm0 4h16M8 3v4m8-4v4",
+  },
+  {
     href: "/tasks",
     label: "Tasks",
     blurb: "Assignments, split into small steps.",

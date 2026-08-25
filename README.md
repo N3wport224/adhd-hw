@@ -14,7 +14,7 @@ npm run dev      # http://localhost:3000
 npm run build    # production build
 npm run lint     # eslint
 npm run typecheck
-npm test         # node:test over the pure logic — 63 cases
+npm test         # node:test over the pure logic — 75 cases
 ```
 
 ## What it does
@@ -45,6 +45,13 @@ rows start unchecked. Confirmed rows become tasks on that course, and the
 grading breakdown is saved to the course page. Re-scanning the same document
 skips what it already imported.
 
+**Schedule** (`/schedule`) — everything with a due date across all courses, on
+a calendar. Week view is the default because a week is the span you can act
+on; month view is there for orientation. Colour is the course. Selecting a day
+opens its full list with working checkboxes, and when the visible span is
+empty it names the next day that has work rather than showing a blank grid
+that looks like a broken import.
+
 **Tasks** (`/tasks`) — the full list, grouped by when work is due, with
 anything past this week collapsed. "Break into steps" turns an assignment
 into micro-steps from a template matched to its title; the steps are editable
@@ -69,6 +76,7 @@ adhd-hw/
     │   ├── globals.css                 # design tokens, base styles, animations
     │   ├── page.tsx                    # Focus dashboard
     │   ├── courses/[courseId]/page.tsx
+    │   ├── schedule/page.tsx
     │   ├── reader/page.tsx             # library
     │   ├── reader/[documentId]/page.tsx
     │   └── tasks/page.tsx
@@ -80,6 +88,8 @@ adhd-hw/
     │   ├── syllabus/                   # SyllabusScanner, SyllabusReviewModal
     │   ├── documents/                  # DocumentDropzone, DocumentRow, LibraryView
     │   ├── reader/                     # ReaderView, ReaderControls, ReaderPane
+    │   ├── schedule/                   # ScheduleView, WeekGrid, MonthGrid,
+    │   │                               #   DayPanel, TaskChip
     │   ├── tasks/                      # TasksView, TaskCard, SubtaskList,
     │   │                               #   BreakdownDialog
     │   ├── focus/                      # FocusView, FocusMode, PomodoroTimer,
@@ -93,6 +103,7 @@ adhd-hw/
     │   ├── taskBreakdown.ts            # assignment-shape templates
     │   ├── syllabusParser.ts           # assignments + grading weights from text
     │   ├── syllabusDates.ts            # date recognition, anchored to a term
+    │   ├── schedule.ts                 # calendar grids, local-day grouping
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/sentences.ts      # the sentence splitter
     │   ├── theme.tsx, courseStyles.ts, utils.ts, useLatestRef.ts
@@ -141,6 +152,14 @@ A few decisions worth knowing before extending this:
 - **Assignment titles are taken from before the date, not by cutting the date
   out.** "Midterm 1 will be held on 10/07 in the usual room" splices badly;
   everything before the date is the name, everything after it is circumstance.
+- **The calendar groups by local day, never by UTC day.** A due date is
+  stored as the instant of local midnight on the day the student picked, so
+  grouping by UTC would shift half a term one square left for anyone west of
+  Greenwich.
+- **Never ask `toLocaleDateString` for a partial format.** A day and a year
+  with no month is not a format any locale defines, and browsers answer it
+  with a debug string ("2026 (day: 12)"). Assemble headings from whole
+  formats instead.
 - **Storage is IndexedDB, not localStorage.** A term of extracted PDF text
   runs to megabytes; localStorage's ~5MB budget would start rejecting uploads
   first. Existing localStorage data is migrated on first load, and a failed
@@ -153,6 +172,9 @@ A few decisions worth knowing before extending this:
   percentage — and will miss anything laid out as a table of images, or
   phrased unusually. The review step exists because of this, not in spite
   of it.
+- **The schedule shows what is due, not when class meets.** Meeting times,
+  office hours and rooms are not parsed out of the syllabus yet, so they do
+  not appear on the calendar.
 - **Slash dates are read US-style.** "10/12" is October 12 unless the first
   number is above 12, in which case it can only be a day.
 - **Scanned PDFs have no text layer.** They are rejected with a message
@@ -167,7 +189,9 @@ A few decisions worth knowing before extending this:
 
 ## Next up
 
-1. A week view built on the imported dates.
+1. Parsing class meeting times, instructor, office hours and room out of the
+   syllabus, so the calendar can show when a class actually meets rather than
+   only what is due. Today `meetingInfo` is free text you type yourself.
 2. Recurring items, so "problem set due every Friday" becomes twelve tasks
    rather than one.
 3. A Supabase `DataStore` adapter plus auth, so data follows the student
