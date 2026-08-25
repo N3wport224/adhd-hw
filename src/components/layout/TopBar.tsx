@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { NAV_ITEMS, isActivePath } from "@/components/layout/navigation";
+import { EXTRA_SECTIONS, NAV_ITEMS, isActivePath } from "@/components/layout/navigation";
 
 interface TopBarProps {
   onOpenMenu(): void;
@@ -15,7 +15,9 @@ interface TopBarProps {
  */
 export function TopBar({ onOpenMenu }: TopBarProps) {
   const pathname = usePathname();
-  const current = NAV_ITEMS.find((item) => isActivePath(pathname, item.href));
+  const current = [...NAV_ITEMS, ...EXTRA_SECTIONS].find((item) =>
+    isActivePath(pathname, item.href),
+  );
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--color-border-soft)] bg-[var(--color-canvas)]">

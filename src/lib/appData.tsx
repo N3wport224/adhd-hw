@@ -49,6 +49,8 @@ interface AppDataValue {
   removeDocument(id: string): void;
   /** Non-null when the last write failed — usually the disk quota. */
   saveError: string | null;
+  /** Wholesale replacement, for importing a backup or starting over. */
+  replaceAll(data: AppData): void;
 }
 
 const AppDataContext = createContext<AppDataValue | null>(null);
@@ -280,11 +282,14 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const replaceAll = useCallback((next: AppData) => setData(next), []);
+
   const value = useMemo<AppDataValue>(
     () => ({
       data,
       ready,
       saveError,
+      replaceAll,
       addCourse,
       updateCourse,
       removeCourse,
@@ -299,7 +304,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       removeDocument,
     }),
     [
-      data, ready, saveError,
+      data, ready, saveError, replaceAll,
       addCourse, updateCourse, removeCourse,
       addTask, importTasks, updateTask, removeTask, setSubtasks, toggleSubtask,
       addDocument, updateDocument, removeDocument,

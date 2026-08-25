@@ -74,6 +74,12 @@ emphasised.
 next step and a Pomodoro timer, and nothing else. Completed focus blocks are
 counted against the task.
 
+**Settings & backup** (`/settings`) — download everything as a JSON file and
+import it back. Importing adds to what is there and skips anything already
+present, so importing the same file twice is safe. Also asks the browser for
+durable storage, which is what stops it clearing your data to make room for
+other sites.
+
 **Throughout** — dark/light mode applied before first paint, keyboard support
 everywhere, motion that respects `prefers-reduced-motion`, and persistence in
 IndexedDB behind a `DataStore` interface.
@@ -101,6 +107,7 @@ adhd-hw/
     │   ├── documents/                  # DocumentDropzone, DocumentRow, LibraryView
     │   ├── reader/                     # ReaderView, ReaderControls, ReaderPane,
     │   │                               #   ReaderSettingsPanel
+    │   ├── settings/                   # SettingsView
     │   ├── schedule/                   # ScheduleView, WeekGrid, MonthGrid,
     │   │                               #   DayPanel, TaskChip
     │   ├── tasks/                      # TasksView, TaskCard, SubtaskList,
@@ -121,6 +128,8 @@ adhd-hw/
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format
     │   ├── readerSettings.ts           # per-device reading comfort settings
+    │   ├── backup.ts                   # export, import and merge
+    │   ├── storagePersistence.ts       # durable-storage request and usage
     │   ├── documents/sentences.ts      # the sentence splitter
     │   ├── theme.tsx, courseStyles.ts, utils.ts, useLatestRef.ts
     │   └── **/__tests__/               # node:test suites for the pure logic
@@ -195,6 +204,13 @@ A few decisions worth knowing before extending this:
   with no month is not a format any locale defines, and browsers answer it
   with a debug string ("2026 (day: 12)"). Assemble headings from whole
   formats instead.
+- **Imported records always get fresh ids.** A backup taken on this device
+  can be imported back into it without colliding with what it was taken from,
+  and matching records are skipped rather than duplicated — so importing
+  twice leaves you where importing once did.
+- **A refused import changes nothing.** The parser is strict on purpose:
+  half-applying a file it does not understand, over a term's work, is worse
+  than declining it.
 - **Storage is IndexedDB, not localStorage.** A term of extracted PDF text
   runs to megabytes; localStorage's ~5MB budget would start rejecting uploads
   first. Existing localStorage data is migrated on first load, and a failed
@@ -207,6 +223,8 @@ A few decisions worth knowing before extending this:
   percentage — and will miss anything laid out as a table of images, or
   phrased unusually. The review step exists because of this, not in spite
   of it.
+- **There is no sync and no account.** Data lives in one browser on one
+  device. The backup file is the only way to move it or keep it safe.
 - **Class meetings appear in week view only.** Three classes meeting three
   times a week would bury the deadlines a month grid exists to show.
 - **One meeting pattern per course.** A class with a separate lab or section

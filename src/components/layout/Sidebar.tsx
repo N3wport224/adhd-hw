@@ -111,9 +111,41 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         </div>
       ) : null}
 
-      <p className="mt-auto px-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
-        Everything is saved on this device. One small step is still a step.
-      </p>
+      {/* Settings sits below the divider rather than in the nav: the nav is
+          about the work, and a settings link among it is one more thing to
+          scan past every time. */}
+      <div className="mt-auto space-y-2 border-t border-[var(--color-border-soft)] pt-3">
+        <Link
+          href="/settings"
+          onClick={onNavigate}
+          aria-current={pathname === "/settings" ? "page" : undefined}
+          className={cn(
+            "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm transition",
+            pathname === "/settings"
+              ? "bg-[var(--color-surface-muted)] text-[var(--color-ink)]"
+              : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
+          )}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className="size-5 shrink-0"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2.5v2m0 15v2M4.2 7l1.7 1m12.2 8 1.7 1M2.5 12h2m15 0h2M4.2 17l1.7-1m12.2-8 1.7-1" />
+          </svg>
+          Settings &amp; backup
+        </Link>
+
+        <p className="px-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
+          Everything is saved on this device. One small step is still a step.
+        </p>
+      </div>
     </nav>
   );
 }

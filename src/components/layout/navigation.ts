@@ -42,6 +42,20 @@ export const NAV_ITEMS: NavItem[] = [
   },
 ];
 
+/**
+ * Sections that are reachable but not part of the main nav. The header still
+ * has to name them — a page whose title falls back to the app's own name
+ * reads like something went wrong.
+ */
+export const EXTRA_SECTIONS: NavItem[] = [
+  {
+    href: "/settings",
+    label: "Settings",
+    blurb: "Backups and how this browser stores your work.",
+    iconPath: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z",
+  },
+];
+
 /** Matches nested routes (/courses/abc) to their top-level nav item. */
 export function isActivePath(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
