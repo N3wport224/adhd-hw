@@ -9,12 +9,19 @@ import {
 } from "@/lib/documents/extract";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import type { StudyDocument } from "@/types";
 
 interface DocumentDropzoneProps {
   /** Documents dropped here are bound to this course. Null files them as unfiled. */
   courseId: string | null;
   /** Named in the confirmation line, so the binding is visible not implied. */
   courseName?: string;
+  /**
+   * Called with each stored document once it has been read. The course page
+   * uses this to offer a syllabus scan; the library has nowhere to file the
+   * results, so it passes nothing.
+   */
+  onDocumentAdded?(document: StudyDocument): void;
 }
 
 interface Progress {
@@ -23,7 +30,11 @@ interface Progress {
   total: number;
 }
 
-export function DocumentDropzone({ courseId, courseName }: DocumentDropzoneProps) {
+export function DocumentDropzone({
+  courseId,
+  courseName,
+  onDocumentAdded,
+}: DocumentDropzoneProps) {
   const { addDocument } = useAppData();
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,13 +56,15 @@ export function DocumentDropzone({ courseId, courseName }: DocumentDropzoneProps
 
       const problems: string[] = [];
       const succeeded: string[] = [];
+      const stored: StudyDocument[] = [];
 
       for (const [position, file] of files.entries()) {
         setProgress({ fileName: file.name, position: position + 1, total: files.length });
         try {
           const draft = await extractDocument(file, courseId);
-          addDocument(draft);
-          succeeded.push(draft.title);
+          const document = addDocument(draft);
+          succeeded.push(document.title);
+          stored.push(document);
         } catch (error) {
           problems.push(
             error instanceof ExtractionError
@@ -64,8 +77,12 @@ export function DocumentDropzone({ courseId, courseName }: DocumentDropzoneProps
       setProgress(null);
       setFailures(problems);
       setAdded(succeeded);
+
+      // Announced after the state above, so the confirmation line is already
+      // on screen behind whatever the caller opens.
+      for (const document of stored) onDocumentAdded?.(document);
     },
-    [addDocument, courseId],
+    [addDocument, courseId, onDocumentAdded],
   );
 
   const onDrop = useCallback(

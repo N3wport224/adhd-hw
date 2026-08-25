@@ -30,16 +30,29 @@ export type CourseIconKey =
   | "heart"
   | "scale";
 
+/** One row of a course's grading breakdown, e.g. "Midterms" at 40%. */
+export interface GradeWeight {
+  label: string;
+  percent: number;
+}
+
 export interface Course {
   id: string;
   name: string;
   /** Short code shown on compact chips, e.g. "PSY 210". */
   code: string;
   instructor: string;
-  /** Free-text for now; the syllabus parser will populate this later. */
   meetingInfo: string;
   color: CourseColorKey;
   icon: CourseIconKey;
+  /**
+   * First day of the term. Syllabi write "Oct 12" and "Week 4" without a
+   * year, so this is what those resolve against. Optional because courses
+   * created before syllabus parsing existed do not have one.
+   */
+  termStart?: ISODateString | null;
+  /** Extracted from the syllabus, or entered by hand. */
+  gradingWeights?: GradeWeight[];
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -57,6 +70,18 @@ export interface SubTask {
 
 export type TaskStatus = "todo" | "in_progress" | "done";
 
+/**
+ * Where a task came from. Imported tasks record the document they were read
+ * out of, so a second scan of the same syllabus can recognise what it already
+ * created instead of duplicating it.
+ */
+export interface TaskSource {
+  kind: "syllabus";
+  documentId: string;
+  /** The syllabus line the task was read from, for "where did this come from?". */
+  excerpt: string;
+}
+
 export interface Task {
   id: string;
   courseId: string | null;
@@ -67,6 +92,8 @@ export interface Task {
   subtasks: SubTask[];
   /** Completed pomodoro count, for the visual timer. */
   pomodorosCompleted: number;
+  /** Absent for tasks the student typed in themselves. */
+  source?: TaskSource;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

@@ -16,7 +16,13 @@ import { TaskCard } from "@/components/tasks/TaskCard";
 import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
 import { DocumentDropzone } from "@/components/documents/DocumentDropzone";
 import { DocumentRow } from "@/components/documents/DocumentRow";
-import type { CourseDraft, Task } from "@/types";
+import { GradingBreakdown } from "@/components/courses/GradingBreakdown";
+import {
+  SyllabusScanner,
+  shouldOfferScan,
+  type ScanSummary,
+} from "@/components/syllabus/SyllabusScanner";
+import type { CourseDraft, StudyDocument, Task } from "@/types";
 
 export function CourseDetail({ courseId }: { courseId: string }) {
   const { data, ready, updateCourse, removeCourse } = useAppData();
@@ -24,6 +30,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
+  const [scanning, setScanning] = useState<StudyDocument | null>(null);
+  const [scanSummary, setScanSummary] = useState<ScanSummary | null>(null);
 
   const tasks = useMemo(
     () => data.tasks.filter((task) => task.courseId === courseId),
@@ -132,16 +140,64 @@ export function CourseDetail({ courseId }: { courseId: string }) {
 
         {/* Bound to this course by id at the point of upload, so a file dropped
             here can never end up filed under the wrong class. */}
-        <DocumentDropzone courseId={courseId} courseName={course.name} />
+        <DocumentDropzone
+          courseId={courseId}
+          courseName={course.name}
+          onDocumentAdded={(document) => {
+            // Opened only for documents that read like a syllabus. Everything
+            // else — a lecture reading, a paper — uploads silently, because a
+            // modal on every file would train people to dismiss it unread.
+            if (shouldOfferScan(document, course?.termStart)) setScanning(document);
+          }}
+        />
+
+        {scanSummary ? (
+          <p role="status" className="animate-rise-fade text-sm text-[var(--color-ink-muted)]">
+            Added {scanSummary.added}{" "}
+            {scanSummary.added === 1 ? "assignment" : "assignments"} to this course
+            {scanSummary.skipped > 0
+              ? `, skipped ${scanSummary.skipped} already imported`
+              : ""}
+            {scanSummary.weights > 0 ? ", and saved the grading breakdown" : ""}.{" "}
+            <Link href="/tasks" className="underline underline-offset-4">
+              See them
+            </Link>
+            .
+          </p>
+        ) : null}
 
         {documents.length > 0 ? (
           <Card padded={false} className="divide-y divide-[var(--color-border-soft)] px-6">
             {documents.map((document) => (
-              <DocumentRow key={document.id} document={document} showCourse={false} />
+              <DocumentRow
+                key={document.id}
+                document={document}
+                showCourse={false}
+                onScan={() => setScanning(document)}
+              />
             ))}
           </Card>
         ) : null}
       </section>
+
+      {course.gradingWeights && course.gradingWeights.length > 0 ? (
+        <section className="space-y-4">
+          <CardTitle>What the grade is made of</CardTitle>
+          <Card>
+            <GradingBreakdown course={course} />
+          </Card>
+        </section>
+      ) : null}
+
+      <SyllabusScanner
+        course={course}
+        document={scanning}
+        onClose={() => setScanning(null)}
+        onImported={(summary) => {
+          setScanning(null);
+          setScanSummary(summary);
+        }}
+      />
 
       <BreakdownDialog
         open={breakdownTask !== null}

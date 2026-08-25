@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { EMPTY_DATA, localDataStore } from "@/lib/storage";
+import { useLatestRef } from "@/lib/useLatestRef";
 import { createId } from "@/lib/utils";
 import type {
   AppData,
@@ -30,6 +31,11 @@ interface AppDataValue {
   updateCourse(id: string, patch: Partial<CourseDraft>): void;
   removeCourse(id: string): void;
   addTask(draft: TaskDraft): Task;
+  /**
+   * Adds many tasks at once, skipping any that duplicate a task already
+   * imported from the same document.
+   */
+  importTasks(drafts: TaskDraft[]): { added: number; skipped: number };
   updateTask(id: string, patch: Partial<Omit<Task, "id" | "createdAt">>): void;
   removeTask(id: string): void;
   setSubtasks(taskId: string, subtasks: SubTask[]): void;
@@ -50,6 +56,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<AppData>(EMPTY_DATA);
   const [ready, setReady] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Lets callbacks read the newest data without becoming dependencies of it.
+  const dataRef = useLatestRef(data);
   // Guards the save effect so the first render never writes EMPTY_DATA over
   // whatever is already in storage.
   const loaded = useRef(false);
@@ -134,6 +142,57 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setData((prev) => ({ ...prev, tasks: [...prev.tasks, task] }));
     return task;
   }, []);
+
+  const importTasks = useCallback(
+    (drafts: TaskDraft[]) => {
+      // Deduplicated here rather than inside the state updater: React may run
+      // an updater late or twice, and the counts reported back to the student
+      // ("added 8, skipped 3") have to be the real ones.
+      //
+      // Re-scanning a syllabus should be safe. Two tasks are the same import
+      // if they came from the same document and share a title and due date.
+      // Anything the student has since edited no longer matches, and so is
+      // left alone — an edited task is exactly the one that must not be
+      // silently replaced.
+      const importKey = (
+        documentId: string | undefined,
+        title: string,
+        dueAt: string | null,
+      ) => `${documentId}|${title.trim().toLowerCase()}|${dueAt ?? ""}`;
+
+      const existing = new Set(
+        dataRef.current.tasks
+          .filter((task) => task.source?.kind === "syllabus")
+          .map((task) => importKey(task.source?.documentId, task.title, task.dueAt)),
+      );
+
+      const now = new Date().toISOString();
+      const fresh: Task[] = [];
+      let skipped = 0;
+
+      for (const draft of drafts) {
+        const key = importKey(draft.source?.documentId, draft.title, draft.dueAt);
+        if (existing.has(key)) {
+          skipped += 1;
+          continue;
+        }
+        existing.add(key);
+        fresh.push({
+          ...draft,
+          id: createId(),
+          pomodorosCompleted: 0,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      if (fresh.length > 0) {
+        setData((prev) => ({ ...prev, tasks: [...prev.tasks, ...fresh] }));
+      }
+      return { added: fresh.length, skipped };
+    },
+    [dataRef],
+  );
 
   const updateTask = useCallback(
     (id: string, patch: Partial<Omit<Task, "id" | "createdAt">>) => {
@@ -229,6 +288,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       updateCourse,
       removeCourse,
       addTask,
+      importTasks,
       updateTask,
       removeTask,
       setSubtasks,
@@ -240,7 +300,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     [
       data, ready, saveError,
       addCourse, updateCourse, removeCourse,
-      addTask, updateTask, removeTask, setSubtasks, toggleSubtask,
+      addTask, importTasks, updateTask, removeTask, setSubtasks, toggleSubtask,
       addDocument, updateDocument, removeDocument,
     ],
   );

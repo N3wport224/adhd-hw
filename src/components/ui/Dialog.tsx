@@ -7,6 +7,8 @@ interface DialogProps {
   open: boolean;
   title: string;
   description?: string;
+  /** "wide" is for review tables, which need room for a title and a date side by side. */
+  size?: "default" | "wide";
   onClose(): void;
   children: React.ReactNode;
 }
@@ -18,7 +20,14 @@ const FOCUSABLE =
  * Modal built on <dialog>-like semantics without the native element, so the
  * backdrop, scroll lock and focus behaviour stay consistent across browsers.
  */
-export function Dialog({ open, title, description, onClose, children }: DialogProps) {
+export function Dialog({
+  open,
+  title,
+  description,
+  size = "default",
+  onClose,
+  children,
+}: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusTo = useRef<HTMLElement | null>(null);
 
@@ -85,7 +94,8 @@ export function Dialog({ open, title, description, onClose, children }: DialogPr
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "animate-rise-fade relative w-full max-w-lg overflow-y-auto",
+          "animate-rise-fade relative w-full overflow-y-auto",
+          size === "wide" ? "max-w-3xl" : "max-w-lg",
           "max-h-[90vh] rounded-t-[var(--radius-card)] sm:rounded-[var(--radius-card)]",
           "border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-6 shadow-xl",
         )}

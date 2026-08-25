@@ -24,16 +24,22 @@ interface DocumentRowProps {
   document: StudyDocument;
   /** Hidden on a course page, where every row is the same course. */
   showCourse?: boolean;
+  /**
+   * Offered only where there is a course to file the results under. Lets a
+   * syllabus be re-scanned after the term start is corrected, or scanned at
+   * all if the upload-time offer was dismissed.
+   */
+  onScan?(): void;
 }
 
-export function DocumentRow({ document, showCourse = true }: DocumentRowProps) {
+export function DocumentRow({ document, showCourse = true, onScan }: DocumentRowProps) {
   const { data, removeDocument, updateDocument } = useAppData();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const course = data.courses.find((item) => item.id === document.courseId) ?? null;
   const minutes = estimateMinutes(document.paragraphs);
 
   return (
-    <div className="relative flex items-start gap-4 py-4">
+    <div className="relative flex flex-wrap items-start gap-x-4 gap-y-2 py-4">
       <span
         aria-hidden="true"
         className={cn(
@@ -44,7 +50,7 @@ export function DocumentRow({ document, showCourse = true }: DocumentRowProps) {
         {KIND_LABELS[document.kind]}
       </span>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-40 flex-1">
         <h3 className="font-medium">
           <Link
             href={`/reader/${document.id}`}
@@ -67,7 +73,11 @@ export function DocumentRow({ document, showCourse = true }: DocumentRowProps) {
             </span>
           ) : null}
           <span>~{minutes} min read</span>
-          {document.pageCount ? <span>{document.pageCount} pages</span> : null}
+          {document.pageCount ? (
+            <span>
+              {document.pageCount} {document.pageCount === 1 ? "page" : "pages"}
+            </span>
+          ) : null}
           <span>{formatSize(document.fileSize)}</span>
           {document.lastSentenceIndex > 0 ? (
             <span className="text-[var(--color-accent)]">In progress</span>
@@ -75,7 +85,19 @@ export function DocumentRow({ document, showCourse = true }: DocumentRowProps) {
         </p>
       </div>
 
-      <div className="relative z-10 flex shrink-0 items-center gap-2">
+      {/* Wraps below the title on narrow screens: three controls plus a
+          course picker do not fit beside a filename on a phone. */}
+      <div className="relative z-10 ml-auto flex flex-wrap items-center gap-2">
+        {onScan ? (
+          <button
+            type="button"
+            onClick={onScan}
+            className="min-h-9 rounded-lg px-3 text-sm font-medium text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          >
+            Scan for dates
+          </button>
+        ) : null}
+
         {/* Refiling from the row itself: a document dropped into the wrong
             course is the most likely thing to need fixing, and making that a
             trip to another screen is how libraries end up disorganised. */}

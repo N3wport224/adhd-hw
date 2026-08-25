@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test \"src/**/*.test.ts\""
+    "test": "node --experimental-strip-types --import ./scripts/register-test-aliases.mjs --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "mammoth": "^1.12.1",
