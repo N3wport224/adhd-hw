@@ -6,15 +6,54 @@ constraint: **the app should never show you everything at once.**
 Everything runs in the browser. Documents are parsed on the device and never
 uploaded anywhere.
 
-## Running it
+## Run it
+
+Needs **Node 20.9 or newer** (`node -v` to check).
 
 ```bash
+git clone <this repo>
+cd adhd-hw
 npm install
-npm run dev      # http://localhost:3000
-npm run build    # production build
-npm run lint     # eslint
-npm run typecheck
-npm test         # node:test over the pure logic — 98 cases
+npm run dev
+```
+
+Then open **http://localhost:3000**. There is no database to set up, no API key,
+no `.env` file — everything runs in the browser and stores its data there.
+
+### Try it in this order
+
+1. **Courses → Add your first course.** Give it a name and a colour.
+2. **Open the course and drop a syllabus on it** (PDF or Word). It parses, then
+   opens a review panel. Check the term start date first — every bare date like
+   "Oct 12" depends on it. Then *Select all* → *Add*.
+3. **Schedule.** Your deadlines are now on a calendar, coloured by course. If
+   the current week is empty it will point you at the next week that isn't.
+4. **Library → drop in a reading**, open it, and press play. Space plays and
+   pauses, arrows move a sentence, shift+arrows move a section.
+5. **Focus → Start a focus session** for a Pomodoro timer on one task.
+6. **Settings → Download a backup** once you have anything worth keeping.
+
+### If something goes wrong
+
+- **No sound in the reader.** Your browser or OS has no speech voices
+  installed. Chrome on desktop is the most reliable; the pane still works for
+  reading silently.
+- **A PDF comes in as one wall of text.** It sets everything in one font size,
+  so there are no headings to find. Word and Markdown files carry real
+  structure and always come through exactly.
+- **A scanned PDF is rejected.** There is no text layer in it to read. OCR it
+  first.
+- **Dates landed a year out.** The term start in the review panel was wrong.
+  Re-scan from the document row (*Scan for dates*) with the right date.
+
+## Commands
+
+```bash
+npm run dev        # development server
+npm run build      # production build
+npm start          # serve the production build
+npm run check      # typecheck, lint and tests together
+npm test           # node:test over the pure logic — 129 cases
 ```
 
 ## What it does

@@ -2,13 +2,17 @@
   "name": "adhd-hw",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --import ./scripts/register-test-aliases.mjs --test \"src/**/*.test.ts\""
+    "test": "node --experimental-strip-types --import ./scripts/register-test-aliases.mjs --test \"src/**/*.test.ts\"",
+    "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {
     "mammoth": "^1.12.1",
