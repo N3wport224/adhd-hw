@@ -1,0 +1,137 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: the theme toggle owns the `dark` class on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Generous default rhythm — whitespace is a feature here, not decoration. */
+  --radius-card: 1rem;
+
+  /* Light: warm paper rather than clinical white, to cut glare. */
+  --color-canvas: #f7f6f3;
+  --color-surface: #ffffff;
+  --color-surface-muted: #efeee9;
+  --color-border-soft: #e2e0d9;
+  --color-ink: #23262b;
+  --color-ink-muted: #5c6169;
+  --color-accent: #4b7f7c;
+  --color-accent-soft: #dbe9e8;
+  /* A fainter wash than accent-soft, for large tinted panels. Both themes
+     define it explicitly: a `/40` opacity modifier on a var() would be
+     resolved to one theme's hex at build time and never change. */
+  --color-accent-wash: #edf4f3;
+  --color-focus: #2f6f6c;
+  --color-focus-ring: #b7d2d0;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --color-canvas: #15171a;
+    --color-surface: #1d2024;
+    --color-surface-muted: #24282d;
+    --color-border-soft: #31363d;
+    --color-ink: #e9eaec;
+    --color-ink-muted: #a0a6af;
+    --color-accent: #79b3af;
+    --color-accent-soft: #22383a;
+    --color-accent-wash: #1b282a;
+    --color-focus: #8ec6c1;
+    --color-focus-ring: #3d5c5a;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* Slightly loose by default: dense text is the first thing to lose a
+       reader with ADHD. */
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* A single, unmistakable focus ring everywhere — keyboard users should
+     never have to hunt for where they are. */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+
+  ::selection {
+    background-color: var(--color-accent-soft);
+  }
+}
+
+@layer utilities {
+  /* Content that only screen readers should reach. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+}
+
+/* Celebration and transition motion is opt-out for anyone who asks the OS
+   to reduce it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-check-pop {
+  animation: check-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes rise-fade {
+  from {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-rise-fade {
+  animation: rise-fade 260ms ease-out;
+}
