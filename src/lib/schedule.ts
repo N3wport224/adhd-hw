@@ -1,4 +1,4 @@
-import type { Task } from "@/types";
+import type { Course, Task } from "@/types";
 
 /**
  * Calendar arithmetic for the schedule.
@@ -101,6 +101,56 @@ export function groupByDay(tasks: Task[]) {
     list.sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? "") || a.title.localeCompare(b.title));
   }
   return byDay;
+}
+
+/** A class meeting placed on one particular day. */
+export interface Meeting {
+  course: Course;
+  startTime: string | null;
+  endTime: string | null;
+  location: string;
+}
+
+/** How long a term runs when a course has no end date set. */
+const DEFAULT_TERM_MONTHS = 4;
+
+function termBounds(course: Course) {
+  if (!course.termStart) return null;
+  const start = course.termStart;
+  const end =
+    course.termEnd ??
+    toDayKey(addMonths(new Date(`${start}T00:00:00`), DEFAULT_TERM_MONTHS));
+  return { start, end };
+}
+
+/**
+ * The classes meeting on a given day.
+ *
+ * Recurrence is computed rather than stored: a weekly class is a rule, and
+ * expanding it into a row per week would put hundreds of near-identical
+ * records in storage that all have to be revised the moment a room changes.
+ */
+export function meetingsOnDay(courses: Course[], dayKey: string): Meeting[] {
+  const weekday = new Date(`${dayKey}T00:00:00`).getDay();
+
+  return courses
+    .filter((course) => {
+      const pattern = course.meetingPattern;
+      if (!pattern || pattern.days.length === 0) return false;
+      if (!pattern.days.includes(weekday as (typeof pattern.days)[number])) return false;
+
+      // Outside the term, the rule does not apply — otherwise a class would
+      // appear to meet every Tuesday for ever.
+      const bounds = termBounds(course);
+      return bounds === null || (dayKey >= bounds.start && dayKey <= bounds.end);
+    })
+    .map((course) => ({
+      course,
+      startTime: course.meetingPattern?.startTime ?? null,
+      endTime: course.meetingPattern?.endTime ?? null,
+      location: course.meetingPattern?.location ?? "",
+    }))
+    .sort((a, b) => (a.startTime ?? "99").localeCompare(b.startTime ?? "99"));
 }
 
 /**

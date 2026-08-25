@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import { useAppData } from "@/lib/appData";
 import { formatISODate } from "@/lib/syllabusDates";
+import { describeMeetingPattern } from "@/lib/syllabusCourseInfo";
 import { KIND_LABELS, type Confidence, type SyllabusParseResult } from "@/lib/syllabusParser";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { controlClass } from "@/components/ui/Field";
-import type { Course, GradeWeight, StudyDocument } from "@/types";
+import type { Course, GradeWeight, MeetingPattern, StudyDocument } from "@/types";
 
 interface SyllabusReviewModalProps {
   open: boolean;
@@ -18,7 +19,12 @@ interface SyllabusReviewModalProps {
   /** Re-runs the parse against a different term start. */
   onChangeTermStart(termStart: string): void;
   onClose(): void;
-  onImported(summary: { added: number; skipped: number; weights: number }): void;
+  onImported(summary: {
+    added: number;
+    skipped: number;
+    weights: number;
+    details: boolean;
+  }): void;
 }
 
 /** One editable row of the review table. */
@@ -61,6 +67,114 @@ export function SyllabusReviewModal(props: SyllabusReviewModalProps) {
   );
 }
 
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/**
+ * Days as toggles and times as fields, rather than a text box to retype.
+ * The parser gets the pattern right most of the time; correcting a single
+ * wrong day should cost one tap.
+ */
+function MeetingPatternEditor({
+  pattern,
+  onChange,
+}: {
+  pattern: MeetingPattern | null;
+  onChange(next: MeetingPattern | null): void;
+}) {
+  const current: MeetingPattern = pattern ?? {
+    days: [],
+    startTime: null,
+    endTime: null,
+    location: "",
+  };
+
+  const toggleDay = (day: number) => {
+    const days = current.days.includes(day as MeetingPattern["days"][number])
+      ? current.days.filter((item) => item !== day)
+      : [...current.days, day as MeetingPattern["days"][number]].sort((a, b) => a - b);
+    onChange(days.length === 0 && !current.startTime ? null : { ...current, days });
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">When it meets</p>
+      <div className="flex flex-wrap gap-1">
+        {DAY_LABELS.map((label, day) => {
+          const on = current.days.includes(day as MeetingPattern["days"][number]);
+          return (
+            <button
+              key={label}
+              type="button"
+              onClick={() => toggleDay(day)}
+              aria-pressed={on}
+              className={cn(
+                "min-h-10 min-w-12 rounded-lg border text-sm font-medium transition",
+                on
+                  ? "border-transparent bg-[var(--color-accent)] text-white"
+                  : "border-[var(--color-border-soft)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]",
+              )}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <label htmlFor="meeting-start" className="block text-xs text-[var(--color-ink-muted)]">
+            Starts
+          </label>
+          <input
+            id="meeting-start"
+            type="time"
+            value={current.startTime ?? ""}
+            onChange={(event) =>
+              onChange({ ...current, startTime: event.target.value || null })
+            }
+            className={cn("w-auto", controlClass("sm"))}
+          />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="meeting-end" className="block text-xs text-[var(--color-ink-muted)]">
+            Ends
+          </label>
+          <input
+            id="meeting-end"
+            type="time"
+            value={current.endTime ?? ""}
+            onChange={(event) => onChange({ ...current, endTime: event.target.value || null })}
+            className={cn("w-auto", controlClass("sm"))}
+          />
+        </div>
+        <div className="min-w-40 flex-1 space-y-1">
+          <label htmlFor="meeting-location" className="block text-xs text-[var(--color-ink-muted)]">
+            Where
+          </label>
+          <input
+            id="meeting-location"
+            value={current.location}
+            onChange={(event) => onChange({ ...current, location: event.target.value })}
+            placeholder="Room or building"
+            className={cn("w-full", controlClass("sm"))}
+          />
+        </div>
+      </div>
+
+      {current.days.length > 0 ? (
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          {describeMeetingPattern(current)}
+        </p>
+      ) : (
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          No meeting days set, so this course will not appear on the calendar as a
+          class.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ReviewForm({
   course,
   document,
@@ -91,11 +205,28 @@ function ReviewForm({
   const [saveWeights, setSaveWeights] = useState(result.gradingWeights.length > 0);
   const [showExcerpt, setShowExcerpt] = useState<string | null>(null);
 
+  const [instructor, setInstructor] = useState(result.details.instructor ?? course.instructor);
+  const [officeHours, setOfficeHours] = useState(result.details.officeHours ?? course.officeHours ?? "");
+  const [meetingPattern, setMeetingPattern] = useState<MeetingPattern | null>(
+    result.details.meetingPattern ?? course.meetingPattern ?? null,
+  );
+  const [saveDetails, setSaveDetails] = useState(
+    result.details.instructor !== null ||
+      result.details.meetingPattern !== null ||
+      result.details.officeHours !== null,
+  );
+  const [termEnd, setTermEnd] = useState(course.termEnd ?? "");
+
   const selected = rows.filter((row) => row.selected);
   const importable = selected.filter((row) => row.title.trim().length > 0);
   const weightTotal = weights.reduce((sum, weight) => sum + weight.percent, 0);
 
-  const nothingFound = result.assignments.length === 0 && result.gradingWeights.length === 0;
+  const foundDetails =
+    result.details.instructor !== null ||
+    result.details.meetingPattern !== null ||
+    result.details.officeHours !== null;
+  const nothingFound =
+    result.assignments.length === 0 && result.gradingWeights.length === 0 && !foundDetails;
 
   const patch = (id: string, changes: Partial<Row>) =>
     setRows((current) => current.map((row) => (row.id === id ? { ...row, ...changes } : row)));
@@ -115,10 +246,22 @@ function ReviewForm({
 
     updateCourse(course.id, {
       termStart: result.termStart,
+      termEnd: termEnd || null,
       ...(saveWeights ? { gradingWeights: weights } : {}),
+      ...(saveDetails
+        ? {
+            instructor: instructor.trim(),
+            officeHours: officeHours.trim(),
+            meetingPattern,
+          }
+        : {}),
     });
 
-    onImported({ ...summary, weights: saveWeights ? weights.length : 0 });
+    onImported({
+      ...summary,
+      weights: saveWeights ? weights.length : 0,
+      details: saveDetails && (instructor.trim() !== "" || meetingPattern !== null),
+    });
   }
 
   const orderedRows = useMemo(
@@ -163,6 +306,73 @@ function ReviewForm({
           scanned pages and with schedules laid out as images. The document is
           still in your library and readable — you can add its dates by hand.
         </p>
+      ) : null}
+
+      {foundDetails ? (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-base font-semibold">Course details</h3>
+            <label className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
+              <input
+                type="checkbox"
+                checked={saveDetails}
+                onChange={() => setSaveDetails((current) => !current)}
+                className="size-4 accent-[var(--color-accent)]"
+              />
+              Save to the course
+            </label>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <label htmlFor="detail-instructor" className="block text-sm font-medium">
+                Instructor
+              </label>
+              <input
+                id="detail-instructor"
+                value={instructor}
+                onChange={(event) => setInstructor(event.target.value)}
+                placeholder="Not found"
+                className={cn("w-full", controlClass("sm"))}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="detail-office" className="block text-sm font-medium">
+                Office hours
+              </label>
+              <input
+                id="detail-office"
+                value={officeHours}
+                onChange={(event) => setOfficeHours(event.target.value)}
+                placeholder="Not found"
+                className={cn("w-full", controlClass("sm"))}
+              />
+            </div>
+          </div>
+
+          <MeetingPatternEditor pattern={meetingPattern} onChange={setMeetingPattern} />
+
+          {meetingPattern ? (
+            <div className="space-y-1">
+              <label htmlFor="term-end" className="block text-sm font-medium">
+                Last day of term
+              </label>
+              <input
+                id="term-end"
+                type="date"
+                value={termEnd}
+                min={result.termStart}
+                onChange={(event) => setTermEnd(event.target.value)}
+                className={cn("w-auto", controlClass("sm"))}
+              />
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                Class meetings stop repeating here. Left empty, they run about four
+                months from the start of term.
+              </p>
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
       {rows.length > 0 ? (

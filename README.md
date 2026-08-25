@@ -14,7 +14,7 @@ npm run dev      # http://localhost:3000
 npm run build    # production build
 npm run lint     # eslint
 npm run typecheck
-npm test         # node:test over the pure logic — 75 cases
+npm test         # node:test over the pure logic — 98 cases
 ```
 
 ## What it does
@@ -41,12 +41,17 @@ review step rather than writing anything. It finds assignments (pairing a date
 with something that sounds like a deliverable) and the grading breakdown, and
 shows each row with its confidence, the date exactly as the syllabus wrote it,
 and the source line it came from. Every row is editable and deletable; unsure
-rows start unchecked. Confirmed rows become tasks on that course, and the
-grading breakdown is saved to the course page. Re-scanning the same document
-skips what it already imported.
+rows start unchecked. Confirmed rows become tasks on that course; the grading
+breakdown and course details are saved to the course, and the meeting pattern
+starts appearing on the calendar. Days are toggles and times are fields, so
+correcting a wrong day costs one tap. Re-scanning the same document skips
+what it already imported.
 
 **Schedule** (`/schedule`) — everything with a due date across all courses, on
-a calendar. Week view is the default because a week is the span you can act
+a calendar, plus the classes themselves. Class meetings are drawn as dashed
+outlines rather than filled chips: a lecture is where you will be, not
+something to tick off. They repeat only inside the term, and can be switched
+off. Week view is the default because a week is the span you can act
 on; month view is there for orientation. Colour is the course. Selecting a day
 opens its full list with working checkboxes, and when the visible span is
 empty it names the next day that has work rather than showing a blank grid
@@ -103,6 +108,7 @@ adhd-hw/
     │   ├── taskBreakdown.ts            # assignment-shape templates
     │   ├── syllabusParser.ts           # assignments + grading weights from text
     │   ├── syllabusDates.ts            # date recognition, anchored to a term
+    │   ├── syllabusCourseInfo.ts       # instructor, meeting times, office hours
     │   ├── schedule.ts                 # calendar grids, local-day grouping
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/sentences.ts      # the sentence splitter
@@ -149,6 +155,14 @@ A few decisions worth knowing before extending this:
   "Oct 12" and "Week 4" with no year. A Fall syllabus saying "Jan 20" means
   the following January, and the only way to know that is the term anchor —
   which is why it is the first thing the review modal asks about.
+- **Class meetings are a rule, not rows.** A weekly class is computed from a
+  pattern and the term bounds at render time. Expanding it into a record per
+  week would put hundreds of near-identical rows in storage, all needing
+  revision the moment a room changes.
+- **A meridiem carries forward, never back.** "11:00 to 1:00pm" starts in the
+  morning; borrowing the pm would move it to eleven at night. "2-4pm" is the
+  exception and is handled by plausibility — no class starts at two in the
+  morning.
 - **Assignment titles are taken from before the date, not by cutting the date
   out.** "Midterm 1 will be held on 10/07 in the usual room" splices badly;
   everything before the date is the name, everything after it is circumstance.
@@ -172,9 +186,10 @@ A few decisions worth knowing before extending this:
   percentage — and will miss anything laid out as a table of images, or
   phrased unusually. The review step exists because of this, not in spite
   of it.
-- **The schedule shows what is due, not when class meets.** Meeting times,
-  office hours and rooms are not parsed out of the syllabus yet, so they do
-  not appear on the calendar.
+- **Class meetings appear in week view only.** Three classes meeting three
+  times a week would bury the deadlines a month grid exists to show.
+- **One meeting pattern per course.** A class with a separate lab or section
+  at a different time needs the second one added by hand.
 - **Slash dates are read US-style.** "10/12" is October 12 unless the first
   number is above 12, in which case it can only be a day.
 - **Scanned PDFs have no text layer.** They are rejected with a message
@@ -189,10 +204,8 @@ A few decisions worth knowing before extending this:
 
 ## Next up
 
-1. Parsing class meeting times, instructor, office hours and room out of the
-   syllabus, so the calendar can show when a class actually meets rather than
-   only what is due. Today `meetingInfo` is free text you type yourself.
-2. Recurring items, so "problem set due every Friday" becomes twelve tasks
+1. Recurring items, so "problem set due every Friday" becomes twelve tasks
    rather than one.
+2. Separate lab and section times per course.
 3. A Supabase `DataStore` adapter plus auth, so data follows the student
    across devices.

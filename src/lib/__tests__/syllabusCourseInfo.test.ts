@@ -1,0 +1,152 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  describeMeetingPattern,
+  formatClockTime,
+  formatTimeRange,
+  parseCourseDetails,
+  parseTimeRange,
+  parseWeekdays,
+} from "@/lib/syllabusCourseInfo";
+
+test("reads spelled-out and abbreviated weekday lists", () => {
+  assert.deepEqual(parseWeekdays("Tuesday and Thursday"), [2, 4]);
+  assert.deepEqual(parseWeekdays("Tue, Thu"), [2, 4]);
+  assert.deepEqual(parseWeekdays("Mon / Wed / Fri"), [1, 3, 5]);
+  assert.deepEqual(parseWeekdays("Monday, Wednesday & Friday"), [1, 3, 5]);
+});
+
+test("reads compressed timetable codes", () => {
+  assert.deepEqual(parseWeekdays("MWF"), [1, 3, 5]);
+  assert.deepEqual(parseWeekdays("TuTh"), [2, 4]);
+  assert.deepEqual(parseWeekdays("MW"), [1, 3]);
+  // Th must win over T-then-H.
+  assert.deepEqual(parseWeekdays("Th"), [4]);
+});
+
+test("does not read ordinary words as day codes", () => {
+  assert.deepEqual(parseWeekdays("meets in the usual room"), []);
+  assert.deepEqual(parseWeekdays("Attendance is required"), []);
+});
+
+test("returns days once, in week order", () => {
+  assert.deepEqual(parseWeekdays("Friday, Monday, Friday"), [1, 5]);
+});
+
+test("reads a time range with a meridiem on both ends", () => {
+  assert.deepEqual(parseTimeRange("9:30am - 10:45am"), {
+    startTime: "09:30",
+    endTime: "10:45",
+  });
+});
+
+test("borrows a meridiem written only once", () => {
+  assert.deepEqual(parseTimeRange("2-4pm"), { startTime: "14:00", endTime: "16:00" });
+  assert.deepEqual(parseTimeRange("9:30 - 10:45 a.m."), {
+    startTime: "09:30",
+    endTime: "10:45",
+  });
+});
+
+test("carries a morning start into an afternoon end", () => {
+  // "11:00am to 1:00pm" — the end is explicitly pm.
+  assert.deepEqual(parseTimeRange("11:00am to 1:00pm"), {
+    startTime: "11:00",
+    endTime: "13:00",
+  });
+  // "11:00 to 1:00" with one meridiem cannot mean going backwards.
+  assert.deepEqual(parseTimeRange("11:00 to 1:00 pm"), {
+    startTime: "11:00",
+    endTime: "13:00",
+  });
+});
+
+test("reads a 24-hour range", () => {
+  assert.deepEqual(parseTimeRange("14:00–15:15"), { startTime: "14:00", endTime: "15:15" });
+});
+
+test("reads a lone start time", () => {
+  assert.deepEqual(parseTimeRange("class begins at 9:30am"), {
+    startTime: "09:30",
+    endTime: null,
+  });
+});
+
+test("finds no time where there is none", () => {
+  assert.equal(parseTimeRange("meets Tuesday and Thursday"), null);
+});
+
+test("pulls instructor, meeting pattern and office hours off a syllabus", () => {
+  const details = parseCourseDetails([
+    "PSY 310 — Cognitive Psychology",
+    "Instructor: Dr. Okonkwo. Office hours are Tue and Thu, 11:00am to 1:00pm, in Ross Hall 214.",
+    "Class meets Monday, Wednesday and Friday, 9:30am - 10:45am in Kemeny 007.",
+  ]);
+  assert.equal(details.instructor, "Dr. Okonkwo");
+  assert.deepEqual(details.meetingPattern, {
+    days: [1, 3, 5],
+    startTime: "09:30",
+    endTime: "10:45",
+    location: "Kemeny 007",
+  });
+  assert.match(details.officeHours ?? "", /Tue and Thu/);
+});
+
+test("does not mistake office hours for when the class meets", () => {
+  const details = parseCourseDetails([
+    "Office hours: Wednesday 2-4pm, Kemeny 318.",
+  ]);
+  assert.equal(details.meetingPattern, null);
+  assert.match(details.officeHours ?? "", /Wednesday 2-4pm/);
+});
+
+test("fills in what it can when the syllabus is partial", () => {
+  const daysOnly = parseCourseDetails(["Lecture meets TuTh."]);
+  assert.deepEqual(daysOnly.meetingPattern?.days, [2, 4]);
+  assert.equal(daysOnly.meetingPattern?.startTime, null);
+
+  const nameOnly = parseCourseDetails(["Professor Ada Vance"]);
+  assert.equal(nameOnly.instructor, "Ada Vance");
+  assert.equal(nameOnly.meetingPattern, null);
+});
+
+test("returns nothing for a document that is not a syllabus", () => {
+  const details = parseCourseDetails([
+    "Attention is the process by which the mind selects among competing inputs.",
+  ]);
+  assert.deepEqual(details, { instructor: null, meetingPattern: null, officeHours: null });
+});
+
+test("stops an instructor name before the next fact on the line", () => {
+  const details = parseCourseDetails([
+    "Instructor: Prof. Ada Vance. Office hours Wed 2-4pm, Kemeny 318.",
+  ]);
+  assert.equal(details.instructor, "Prof. Ada Vance");
+});
+
+test("describes a pattern for display", () => {
+  assert.match(
+    describeMeetingPattern({ days: [2, 4], startTime: "11:00", endTime: "13:00", location: "Ross Hall 214" }),
+    /^Tue, Thu · .+ · Ross Hall 214$/,
+  );
+  assert.equal(
+    describeMeetingPattern({ days: [1], startTime: null, endTime: null, location: "" }),
+    "Mon",
+  );
+});
+
+test("writes a shared meridiem once", () => {
+  // The exact strings are locale-dependent; what matters is that a shared
+  // suffix appears once and a differing one appears on both ends.
+  const sameHalf = formatTimeRange("09:30", "10:45");
+  const crossingNoon = formatTimeRange("11:00", "13:00");
+
+  assert.match(sameHalf, /9:30.*10:45/);
+  assert.equal(sameHalf.split(/[AP]M/i).length - 1 || 0, sameHalf.match(/[AP]M/gi)?.length ?? 0);
+  assert.equal((sameHalf.match(/[AP]M/gi) ?? []).length, 1);
+  assert.equal((crossingNoon.match(/[AP]M/gi) ?? []).length, 2);
+});
+
+test("a range with no end is just the start", () => {
+  assert.equal(formatTimeRange("09:30", null), formatClockTime("09:30"));
+});

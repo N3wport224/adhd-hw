@@ -5,13 +5,14 @@ import {
   describeWeek,
   dayKeyOf,
   groupByDay,
+  meetingsOnDay,
   monthGrid,
   nextDayWithWork,
   startOfWeek,
   toDayKey,
   weekDays,
 } from "@/lib/schedule";
-import type { Task } from "@/types";
+import type { Course, Task, Weekday } from "@/types";
 
 const local = (y: number, m: number, d: number) => new Date(y, m - 1, d);
 
@@ -127,4 +128,61 @@ test("orders a day's tasks predictably", () => {
   const day = local(2026, 10, 12).toISOString();
   const grouped = groupByDay([task("b", day, "Zebra"), task("a", day, "Apple")]);
   assert.deepEqual(grouped.get("2026-10-12")!.map((t) => t.title), ["Apple", "Zebra"]);
+});
+
+function course(overrides: Partial<Course> = {}): Course {
+  return {
+    id: "c1",
+    name: "Discrete Mathematics",
+    code: "MATH 240",
+    instructor: "",
+    meetingInfo: "",
+    color: "amber",
+    icon: "calculator",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+const MWF = { days: [1, 3, 5] as Weekday[], startTime: "09:30", endTime: "10:45", location: "Kemeny 007" };
+
+test("places a class on the weekdays it meets", () => {
+  const courses = [course({ meetingPattern: MWF, termStart: "2026-09-07", termEnd: "2026-12-11" })];
+  // 2026-10-12 is a Monday, 2026-10-13 a Tuesday.
+  assert.equal(meetingsOnDay(courses, "2026-10-12").length, 1);
+  assert.equal(meetingsOnDay(courses, "2026-10-13").length, 0);
+});
+
+test("does not place a class outside the term", () => {
+  const courses = [course({ meetingPattern: MWF, termStart: "2026-09-07", termEnd: "2026-12-11" })];
+  assert.equal(meetingsOnDay(courses, "2026-08-31").length, 0); // a Monday before term
+  assert.equal(meetingsOnDay(courses, "2026-12-14").length, 0); // a Monday after term
+  assert.equal(meetingsOnDay(courses, "2026-09-07").length, 1); // first day counts
+  assert.equal(meetingsOnDay(courses, "2026-12-11").length, 1); // last day counts
+});
+
+test("falls back to a default term length when no end date is set", () => {
+  const courses = [course({ meetingPattern: MWF, termStart: "2026-09-07" })];
+  assert.equal(meetingsOnDay(courses, "2026-10-12").length, 1);
+  // Four months on from early September is past the new year.
+  assert.equal(meetingsOnDay(courses, "2027-02-01").length, 0);
+});
+
+test("ignores a course with no pattern or no days", () => {
+  assert.deepEqual(meetingsOnDay([course()], "2026-10-12"), []);
+  assert.deepEqual(
+    meetingsOnDay([course({ meetingPattern: { ...MWF, days: [] } })], "2026-10-12"),
+    [],
+  );
+});
+
+test("orders a day's classes by start time, undated last", () => {
+  const morning = course({ id: "a", code: "AAA", meetingPattern: { ...MWF, startTime: "09:30" } });
+  const afternoon = course({ id: "b", code: "BBB", meetingPattern: { ...MWF, startTime: "14:00" } });
+  const untimed = course({ id: "c", code: "CCC", meetingPattern: { ...MWF, startTime: null } });
+  assert.deepEqual(
+    meetingsOnDay([afternoon, untimed, morning], "2026-10-12").map((m) => m.course.code),
+    ["AAA", "BBB", "CCC"],
+  );
 });

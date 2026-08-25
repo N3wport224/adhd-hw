@@ -6,6 +6,7 @@ import { useAppData } from "@/lib/appData";
 import {
   addDays,
   addMonths,
+  meetingsOnDay,
   describeMonth,
   describeWeek,
   groupByDay,
@@ -33,6 +34,7 @@ export function ScheduleView() {
   const [anchor, setAnchor] = useState(() => new Date());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [courseFilter, setCourseFilter] = useState("all");
+  const [showMeetings, setShowMeetings] = useState(true);
 
   const visibleTasks = useMemo(
     () =>
@@ -46,6 +48,16 @@ export function ScheduleView() {
   );
 
   const tasksByDay = useMemo(() => groupByDay(visibleTasks), [visibleTasks]);
+
+  const meetingCourses = useMemo(
+    () =>
+      data.courses.filter((course) => {
+        if (!course.meetingPattern || course.meetingPattern.days.length === 0) return false;
+        if (courseFilter === "all") return true;
+        return course.id === courseFilter;
+      }),
+    [data.courses, courseFilter],
+  );
   const days = useMemo(() => weekDays(anchor), [anchor]);
   const cells = useMemo(() => monthGrid(anchor), [anchor]);
 
@@ -58,7 +70,9 @@ export function ScheduleView() {
   // its edge, which is the case worth speaking up about.
   const visibleKeys = new Set((mode === "week" ? days : cells).map((day) => day.key));
   const spanIsEmpty = [...visibleKeys].every(
-    (key) => (tasksByDay.get(key) ?? []).length === 0,
+    (key) =>
+      (tasksByDay.get(key) ?? []).length === 0 &&
+      (mode !== "week" || !showMeetings || meetingsOnDay(meetingCourses, key).length === 0),
   );
   const lastVisibleKey = (mode === "week" ? days : cells).at(-1)?.key ?? toDayKey(new Date());
   const nextWorkDay = spanIsEmpty ? nextDayWithWork(lastVisibleKey, tasksByDay) : null;
@@ -186,6 +200,18 @@ export function ScheduleView() {
             ))}
           </div>
 
+          {mode === "week" && data.courses.some((c) => c.meetingPattern?.days.length) ? (
+            <label className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
+              <input
+                type="checkbox"
+                checked={showMeetings}
+                onChange={() => setShowMeetings((current) => !current)}
+                className="size-4 accent-[var(--color-accent)]"
+              />
+              Class times
+            </label>
+          ) : null}
+
           <label className="sr-only" htmlFor="schedule-course">
             Filter by course
           </label>
@@ -211,8 +237,10 @@ export function ScheduleView() {
           days={days}
           tasksByDay={tasksByDay}
           courses={data.courses}
+          meetingCourses={showMeetings ? meetingCourses : []}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
+          showMeetings={showMeetings}
         />
       ) : (
         <MonthGrid

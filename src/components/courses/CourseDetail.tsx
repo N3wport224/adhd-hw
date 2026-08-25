@@ -17,6 +17,7 @@ import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
 import { DocumentDropzone } from "@/components/documents/DocumentDropzone";
 import { DocumentRow } from "@/components/documents/DocumentRow";
 import { GradingBreakdown } from "@/components/courses/GradingBreakdown";
+import { describeMeetingPattern } from "@/lib/syllabusCourseInfo";
 import {
   SyllabusScanner,
   shouldOfferScan,
@@ -93,10 +94,24 @@ export function CourseDetail({ courseId }: { courseId: string }) {
         <div className="min-w-0 flex-1">
           <h2 className="text-2xl font-semibold tracking-tight">{course.name}</h2>
           <p className="text-[var(--color-ink-muted)]">
-            {[course.code, course.instructor, course.meetingInfo]
+            {[
+              course.code,
+              course.instructor,
+              // The parsed pattern is the better answer when there is one;
+              // the free-text field stays as a fallback for courses typed in
+              // by hand before any syllabus was uploaded.
+              course.meetingPattern && course.meetingPattern.days.length > 0
+                ? describeMeetingPattern(course.meetingPattern)
+                : course.meetingInfo,
+            ]
               .filter(Boolean)
               .join(" · ") || "No details yet"}
           </p>
+          {course.officeHours ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              Office hours: {course.officeHours}
+            </p>
+          ) : null}
         </div>
 
         <Button onClick={() => setEditing(true)}>Edit course</Button>
@@ -158,7 +173,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
             {scanSummary.skipped > 0
               ? `, skipped ${scanSummary.skipped} already imported`
               : ""}
-            {scanSummary.weights > 0 ? ", and saved the grading breakdown" : ""}.{" "}
+            {scanSummary.weights > 0 ? ", saved the grading breakdown" : ""}
+            {scanSummary.details ? ", and filled in the course details" : ""}.{" "}
             <Link href="/tasks" className="underline underline-offset-4">
               See them
             </Link>

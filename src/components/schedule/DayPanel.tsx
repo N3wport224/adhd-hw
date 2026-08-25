@@ -4,6 +4,8 @@ import { useAppData } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { cn } from "@/lib/utils";
 import { Card, CardTitle } from "@/components/ui/Card";
+import { formatTimeRange } from "@/lib/syllabusCourseInfo";
+import { meetingsOnDay } from "@/lib/schedule";
 import type { Task } from "@/types";
 
 interface DayPanelProps {
@@ -21,6 +23,7 @@ interface DayPanelProps {
 export function DayPanel({ dayKey, tasks, onClose }: DayPanelProps) {
   const { data, updateTask } = useAppData();
   const date = new Date(`${dayKey}T00:00:00`);
+  const meetings = meetingsOnDay(data.courses, dayKey);
 
   return (
     <Card className="space-y-4">
@@ -41,8 +44,36 @@ export function DayPanel({ dayKey, tasks, onClose }: DayPanelProps) {
         </button>
       </div>
 
+      {meetings.length > 0 ? (
+        <ul className="space-y-1">
+          {meetings.map((meeting) => (
+            <li
+              key={meeting.course.id}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--color-ink-muted)]"
+            >
+              <span
+                className={cn(
+                  "rounded px-1.5 py-0.5 text-xs font-medium",
+                  COURSE_COLORS[meeting.course.color].chip,
+                )}
+              >
+                {meeting.course.code || meeting.course.name}
+              </span>
+              <span>
+                {meeting.startTime
+                  ? formatTimeRange(meeting.startTime, meeting.endTime)
+                  : "Class"}
+              </span>
+              {meeting.location ? <span>{meeting.location}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       {tasks.length === 0 ? (
-        <p className="text-sm text-[var(--color-ink-muted)]">Nothing due this day.</p>
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          {meetings.length > 0 ? "Nothing due this day." : "Nothing due, no class."}
+        </p>
       ) : (
         <ul className="divide-y divide-[var(--color-border-soft)]">
           {tasks.map((task) => {

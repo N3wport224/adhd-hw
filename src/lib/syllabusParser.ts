@@ -6,6 +6,7 @@ import {
   type TermWindow,
 } from "@/lib/syllabusDates";
 import { toSentences } from "@/lib/documents/sentences";
+import { parseCourseDetails, type CourseDetails } from "@/lib/syllabusCourseInfo";
 import type { GradeWeight } from "@/types";
 
 /**
@@ -47,6 +48,8 @@ export interface ParsedAssignment {
 export interface SyllabusParseResult {
   assignments: ParsedAssignment[];
   gradingWeights: GradeWeight[];
+  /** Instructor, meeting pattern and office hours, where the syllabus said. */
+  details: CourseDetails;
   /** The term start the dates were resolved against. */
   termStart: string;
   /** True when the document reads like a syllabus rather than a reading. */
@@ -349,10 +352,14 @@ export function parseSyllabus(
 
   const assignments = extractAssignments(paragraphs, term);
   const { weights, warnings } = extractGradingWeights(paragraphs);
+  const details = parseCourseDetails(paragraphs);
 
   const text = paragraphs.join("\n");
   const looksLikeSyllabus =
-    SYLLABUS_HINT.test(text) || weights.length > 0 || assignments.length >= 3;
+    SYLLABUS_HINT.test(text) ||
+    weights.length > 0 ||
+    details.meetingPattern !== null ||
+    assignments.length >= 3;
 
   const undated = assignments.filter((assignment) => assignment.dueAt === null).length;
   if (undated > 0) {
@@ -361,5 +368,12 @@ export function parseSyllabus(
     );
   }
 
-  return { assignments, gradingWeights: weights, termStart, looksLikeSyllabus, warnings };
+  return {
+    assignments,
+    gradingWeights: weights,
+    details,
+    termStart,
+    looksLikeSyllabus,
+    warnings,
+  };
 }

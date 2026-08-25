@@ -9,7 +9,10 @@ import type { Course, StudyDocument } from "@/types";
 export interface ScanSummary {
   added: number;
   skipped: number;
+  /** How many grading rows were saved, 0 if the student declined. */
   weights: number;
+  /** True when instructor or meeting times were written to the course. */
+  details: boolean;
 }
 
 interface SyllabusScannerProps {

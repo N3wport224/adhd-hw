@@ -30,6 +30,22 @@ export type CourseIconKey =
   | "heart"
   | "scale";
 
+/** 0 = Sunday, matching `Date.prototype.getDay`. */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * When and where a class meets, in a form the calendar can place.
+ *
+ * Times are local "HH:MM" on a 24-hour clock rather than instants: a class
+ * meets at 9:30 every week regardless of what the clocks did in between.
+ */
+export interface MeetingPattern {
+  days: Weekday[];
+  startTime: string | null;
+  endTime: string | null;
+  location: string;
+}
+
 /** One row of a course's grading breakdown, e.g. "Midterms" at 40%. */
 export interface GradeWeight {
   label: string;
@@ -51,8 +67,14 @@ export interface Course {
    * created before syllabus parsing existed do not have one.
    */
   termStart?: ISODateString | null;
+  /** Last day of the term. Bounds how far class meetings repeat. */
+  termEnd?: ISODateString | null;
   /** Extracted from the syllabus, or entered by hand. */
   gradingWeights?: GradeWeight[];
+  /** Structured meeting times, when the syllabus gave enough to place them. */
+  meetingPattern?: MeetingPattern | null;
+  /** Free text — too varied across syllabi to be worth structuring. */
+  officeHours?: string;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
