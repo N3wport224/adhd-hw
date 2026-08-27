@@ -322,7 +322,7 @@ function DocumentReader({ document }: { document: StudyDocument }) {
             />
             <button
               type="submit"
-              className="min-h-11 rounded-xl bg-[var(--color-accent)] px-4 text-sm font-medium text-white"
+              className="min-h-11 rounded-xl bg-[var(--color-accent)] px-4 text-sm font-medium text-[var(--color-on-accent)]"
             >
               Save
             </button>

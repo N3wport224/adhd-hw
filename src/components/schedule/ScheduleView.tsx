@@ -198,7 +198,7 @@ export function ScheduleView() {
                 className={cn(
                   "min-h-9 rounded-lg px-3 text-sm font-medium capitalize transition",
                   mode === option
-                    ? "bg-[var(--color-accent)] text-white"
+                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                     : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
                 )}
               >

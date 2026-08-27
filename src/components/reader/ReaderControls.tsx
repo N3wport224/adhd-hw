@@ -42,7 +42,7 @@ function ControlButton({
       className={cn(
         "grid place-items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-40",
         primary
-          ? "size-14 bg-[var(--color-accent)] text-white hover:brightness-110"
+          ? "size-14 bg-[var(--color-accent)] text-[var(--color-on-accent)] hover:brightness-110"
           : "size-11 border border-[var(--color-border-soft)] bg-[var(--color-surface)] text-[var(--color-ink)] hover:bg-[var(--color-surface-muted)]",
       )}
     >
@@ -178,7 +178,7 @@ export function ReaderControls({
                 className={cn(
                   "min-h-9 rounded-lg px-3 text-sm font-medium transition",
                   reader.rate === rate
-                    ? "bg-[var(--color-accent)] text-white"
+                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                     : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
                 )}
               >

@@ -31,7 +31,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       >
         <span
           aria-hidden="true"
-          className="grid size-9 place-items-center rounded-xl bg-[var(--color-accent)] text-base font-semibold text-white"
+          className="grid size-9 place-items-center rounded-xl bg-[var(--color-accent)] text-base font-semibold text-[var(--color-on-accent)]"
         >
           ◎
         </span>

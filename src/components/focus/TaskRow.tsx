@@ -38,7 +38,7 @@ export function TaskRow({ task, onToggle }: TaskRowProps) {
         className={cn(
           "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg border-2 transition",
           done
-            ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+            ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
             : "border-[var(--color-border-soft)] hover:border-[var(--color-focus)]",
         )}
       >

@@ -36,6 +36,13 @@ no `.env` file — everything runs in the browser and stores its data there.
 6. **Focus → Start a focus session** for a Pomodoro timer on one task.
 7. **Settings → Download a backup** once you have anything worth keeping.
 
+### Accessibility
+
+Audited with axe-core across every page in both themes, plus the dialogs:
+zero violations at WCAG 2.1 AA. The colour tokens are guarded by unit tests
+that compute contrast ratios from the stylesheet itself, so a colour change
+that breaks a pair fails the build rather than shipping.
+
 ### If something goes wrong
 
 - **No sound in the reader.** Your browser or OS has no speech voices
@@ -56,7 +63,7 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 153 cases
+npm test           # node:test over the pure logic — 157 cases
 ```
 
 ## What it does
@@ -213,6 +220,13 @@ A few decisions worth knowing before extending this:
   about their progress through one and Chrome truncates long utterances after
   about fifteen seconds. Per-sentence utterances give exact highlighting,
   working skip controls, and a natural resume point on every browser.
+- **The accent is two tokens, not one.** A filled background that something
+  legible sits on, and a text colour on pale surfaces, pull in opposite
+  directions — the value light enough to read on a dark background is far too
+  light to put white on. Collapsing them is how every primary button in dark
+  mode ended up at 2.4:1. `--color-accent` and `--color-on-accent` are chosen
+  as a pair per theme, and a unit test reads them out of the stylesheet and
+  fails if any text pair drops below WCAG AA.
 - **Reading settings live next to the reading, not on a settings page.** The
   right size and measure depend on the document and on how tired you are; a
   preference you have to leave the page to change is one nobody changes.

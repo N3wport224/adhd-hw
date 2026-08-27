@@ -110,7 +110,7 @@ function MeetingPatternEditor({
               className={cn(
                 "min-h-10 min-w-12 rounded-lg border text-sm font-medium transition",
                 on
-                  ? "border-transparent bg-[var(--color-accent)] text-white"
+                  ? "border-transparent bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                   : "border-[var(--color-border-soft)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)]",
               )}
             >

@@ -44,7 +44,7 @@ export function StepChip({ entry, course }: { entry: PlannedStep; course: Course
         className={cn(
           "mt-px grid size-4 shrink-0 place-items-center rounded border transition",
           done
-            ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+            ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
             : "border-current/40 hover:border-[var(--color-focus)]",
         )}
       >

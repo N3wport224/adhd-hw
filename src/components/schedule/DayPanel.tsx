@@ -90,7 +90,7 @@ export function DayPanel({ dayKey, tasks, onClose }: DayPanelProps) {
                     className={cn(
                       "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md border-2 transition",
                       entry.step.done
-                        ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+                        ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                         : "border-[var(--color-border-soft)] hover:border-[var(--color-focus)]",
                     )}
                   >
@@ -165,7 +165,7 @@ export function DayPanel({ dayKey, tasks, onClose }: DayPanelProps) {
                   className={cn(
                     "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md border-2 transition",
                     done
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+                      ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                       : "border-[var(--color-border-soft)] hover:border-[var(--color-focus)]",
                   )}
                 >

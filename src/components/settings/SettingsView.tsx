@@ -124,6 +124,10 @@ export function SettingsView() {
               ref={fileInput}
               type="file"
               accept="application/json,.json"
+              // Visually hidden but still a form control, so it needs a name
+              // of its own — the button beside it is what people click, and
+              // a screen reader would otherwise reach an unlabelled input.
+              aria-label="Choose a backup file to import"
               className="sr-only"
               onChange={(event) => {
                 const file = event.target.files?.[0];

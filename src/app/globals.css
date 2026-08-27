@@ -16,7 +16,19 @@
   --color-border-soft: #e2e0d9;
   --color-ink: #23262b;
   --color-ink-muted: #5c6169;
-  --color-accent: #4b7f7c;
+  /*
+   * The accent does two jobs that pull in opposite directions: it is a filled
+   * background that white sits on, and it is a text colour on pale surfaces.
+   * One value cannot serve both — the light version needed for text on dark
+   * backgrounds is far too light to put white on top of, which is exactly how
+   * every primary button in dark mode ended up at 2.4:1.
+   *
+   * So the background colour and what goes on top of it are separate tokens,
+   * and each theme picks a pair that clears 4.5:1 in both directions.
+   */
+  --color-accent: #3f6f6c;
+  /* white on accent 5.67:1 · accent as text on the wash 5.09:1 */
+  --color-on-accent: #ffffff;
   --color-accent-soft: #dbe9e8;
   /* A fainter wash than accent-soft, for large tinted panels. Both themes
      define it explicitly: a `/40` opacity modifier on a var() would be
@@ -41,6 +53,8 @@
     --color-ink: #e9eaec;
     --color-ink-muted: #a0a6af;
     --color-accent: #79b3af;
+    /* dark ink on accent 7.59:1 · accent as text on dark surface 6.91:1 */
+    --color-on-accent: #15171a;
     --color-accent-soft: #22383a;
     --color-accent-wash: #1b282a;
     --color-focus: #8ec6c1;
