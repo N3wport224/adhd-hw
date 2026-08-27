@@ -5,6 +5,8 @@ import { useAppData } from "@/lib/appData";
 import { BREAKDOWN_TEMPLATES, suggestSteps, templateForTitle } from "@/lib/taskBreakdown";
 import { createId, cn } from "@/lib/utils";
 import { Dialog } from "@/components/ui/Dialog";
+import { PlanAcrossDays } from "@/components/tasks/PlanAcrossDays";
+import { dayKeyOf } from "@/lib/schedule";
 import { controlClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import type { Task } from "@/types";
@@ -34,6 +36,7 @@ function BreakdownForm({ task, onClose }: { task: Task; onClose(): void }) {
   const [templateId, setTemplateId] = useState(matched?.id ?? "");
   const [steps, setSteps] = useState<string[]>(() => suggestSteps(task.title));
   const [chosen, setChosen] = useState<boolean[]>(() => suggestSteps(task.title).map(() => true));
+  const [plannedDays, setPlannedDays] = useState<string[] | null>(null);
 
   function applyTemplate(id: string) {
     setTemplateId(id);
@@ -48,11 +51,12 @@ function BreakdownForm({ task, onClose }: { task: Task; onClose(): void }) {
     const kept = steps
       .map((title, position) => ({ title: title.trim(), keep: chosen[position] }))
       .filter((step) => step.keep && step.title.length > 0)
-      .map((step) => ({
+      .map((step, position) => ({
         id: createId(),
         title: step.title,
         done: false,
         estimatedMinutes: null,
+        plannedFor: plannedDays?.[position] ?? null,
       }));
 
     // Added to whatever is already there — someone who has half a plan
@@ -124,6 +128,14 @@ function BreakdownForm({ task, onClose }: { task: Task; onClose(): void }) {
           </li>
         ))}
       </ul>
+
+      {keptCount > 0 ? (
+        <PlanAcrossDays
+          stepCount={keptCount}
+          due={task.dueAt ? dayKeyOf(task.dueAt) : null}
+          onChange={setPlannedDays}
+        />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="primary" onClick={handleApply} disabled={keptCount === 0}>

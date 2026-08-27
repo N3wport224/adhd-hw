@@ -5,8 +5,11 @@ import {
   describeWeek,
   dayKeyOf,
   groupByDay,
+  groupStepsByDay,
   meetingsOnDay,
   monthGrid,
+  overdueSteps,
+  stepsOnDay,
   nextDayWithWork,
   startOfWeek,
   toDayKey,
@@ -185,4 +188,62 @@ test("orders a day's classes by start time, undated last", () => {
     meetingsOnDay([afternoon, untimed, morning], "2026-10-12").map((m) => m.course.code),
     ["AAA", "BBB", "CCC"],
   );
+});
+
+function withSteps(id: string, steps: Array<[string, string | null, boolean]>): Task {
+  return {
+    ...task(id, null, id),
+    subtasks: steps.map(([title, plannedFor, done], index) => ({
+      id: `${id}-s${index}`,
+      title,
+      done,
+      estimatedMinutes: null,
+      plannedFor,
+    })),
+  };
+}
+
+test("finds the steps planned for a day", () => {
+  const tasks = [
+    withSteps("essay", [["Outline", "2026-10-12", false], ["Draft", "2026-10-13", false]]),
+    withSteps("reading", [["Skim", "2026-10-12", false]]),
+  ];
+  assert.deepEqual(
+    stepsOnDay(tasks, "2026-10-12").map((entry) => entry.step.title),
+    ["Outline", "Skim"],
+  );
+  assert.equal(stepsOnDay(tasks, "2026-10-14").length, 0);
+});
+
+test("a completed step still shows on its day, struck through rather than gone", () => {
+  const tasks = [withSteps("essay", [["Outline", "2026-10-12", true]])];
+  assert.equal(stepsOnDay(tasks, "2026-10-12").length, 1);
+  assert.equal(stepsOnDay(tasks, "2026-10-12")[0].step.done, true);
+});
+
+test("steps of a finished task drop off the calendar entirely", () => {
+  const tasks = [{ ...withSteps("essay", [["Outline", "2026-10-12", false]]), status: "done" as const }];
+  assert.equal(stepsOnDay(tasks, "2026-10-12").length, 0);
+  assert.equal(groupStepsByDay(tasks).size, 0);
+});
+
+test("collects steps whose day has passed and are still open", () => {
+  const tasks = [
+    withSteps("essay", [
+      ["Outline", "2026-10-10", false],
+      ["Done one", "2026-10-10", true],
+      ["Today", "2026-10-12", false],
+      ["Later", "2026-10-14", false],
+    ]),
+  ];
+  assert.deepEqual(
+    overdueSteps(tasks, "2026-10-12").map((entry) => entry.step.title),
+    ["Outline"],
+  );
+});
+
+test("ignores steps with no day at all", () => {
+  const tasks = [withSteps("essay", [["Someday", null, false]])];
+  assert.equal(groupStepsByDay(tasks).size, 0);
+  assert.equal(overdueSteps(tasks, "2026-10-12").length, 0);
 });

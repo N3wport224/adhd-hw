@@ -40,6 +40,8 @@ interface AppDataValue {
   updateTask(id: string, patch: Partial<Omit<Task, "id" | "createdAt">>): void;
   removeTask(id: string): void;
   setSubtasks(taskId: string, subtasks: SubTask[]): void;
+  /** Assigns one step its own day, or clears it. */
+  setSubtaskDay(taskId: string, subtaskId: string, plannedFor: string | null): void;
   toggleSubtask(taskId: string, subtaskId: string): void;
   addDocument(draft: StudyDocumentDraft): StudyDocument;
   updateDocument(
@@ -226,6 +228,26 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const setSubtaskDay = useCallback(
+    (taskId: string, subtaskId: string, plannedFor: string | null) => {
+      setData((prev) => ({
+        ...prev,
+        tasks: prev.tasks.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                subtasks: task.subtasks.map((step) =>
+                  step.id === subtaskId ? { ...step, plannedFor } : step,
+                ),
+                updatedAt: new Date().toISOString(),
+              }
+            : task,
+        ),
+      }));
+    },
+    [],
+  );
+
   const toggleSubtask = useCallback((taskId: string, subtaskId: string) => {
     setData((prev) => ({
       ...prev,
@@ -298,6 +320,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       updateTask,
       removeTask,
       setSubtasks,
+      setSubtaskDay,
       toggleSubtask,
       addDocument,
       updateDocument,
@@ -306,7 +329,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     [
       data, ready, saveError, replaceAll,
       addCourse, updateCourse, removeCourse,
-      addTask, importTasks, updateTask, removeTask, setSubtasks, toggleSubtask,
+      addTask, importTasks, updateTask, removeTask, setSubtasks, setSubtaskDay, toggleSubtask,
       addDocument, updateDocument, removeDocument,
     ],
   );

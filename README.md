@@ -30,8 +30,11 @@ no `.env` file — everything runs in the browser and stores its data there.
    the current week is empty it will point you at the next week that isn't.
 4. **Library → drop in a reading**, open it, and press play. Space plays and
    pauses, arrows move a sentence, shift+arrows move a section.
-5. **Focus → Start a focus session** for a Pomodoro timer on one task.
-6. **Settings → Download a backup** once you have anything worth keeping.
+5. **Tasks → Break into steps** on something due next week, and let it spread
+   the steps across the days. Then look at Focus and Schedule again — today
+   now has one small piece of it, with a checkbox.
+6. **Focus → Start a focus session** for a Pomodoro timer on one task.
+7. **Settings → Download a backup** once you have anything worth keeping.
 
 ### If something goes wrong
 
@@ -53,7 +56,7 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 129 cases
+npm test           # node:test over the pure logic — 148 cases
 ```
 
 ## What it does
@@ -93,8 +96,10 @@ starts appearing on the calendar. Days are toggles and times are fields, so
 correcting a wrong day costs one tap. Re-scanning the same document skips
 what it already imported.
 
-**Schedule** (`/schedule`) — everything with a due date across all courses, on
-a calendar, plus the classes themselves. Class meetings are drawn as dashed
+**Schedule** (`/schedule`) — planned steps and deadlines across all courses on
+one calendar, plus the classes themselves. Steps carry their own checkbox on
+the day they belong to, so you can tick one off where you read it; completed
+steps stay put with a line through them rather than vanishing. Class meetings are drawn as dashed
 outlines rather than filled chips: a lecture is where you will be, not
 something to tick off. They repeat only inside the term, and can be switched
 off. Week view is the default because a week is the span you can act
@@ -105,9 +110,13 @@ that looks like a broken import.
 
 **Tasks** (`/tasks`) — the full list, grouped by when work is due, with
 anything past this week collapsed. "Break into steps" turns an assignment
-into micro-steps from a template matched to its title; the steps are editable
-before they are added, and the first unfinished one is the only one
-emphasised.
+into micro-steps from a template matched to its title, then **spreads those
+steps across the days before it is due** — one, two or three a day, weekends
+optional. A deadline says when work is finished and nothing about when to
+start, which is how a week of runway becomes one bad Thursday night. Each
+step gets its own day, so a chapter due Friday puts something small on today.
+Steps already written can be spread the same way, and any single step's day
+can be changed by hand.
 
 **Focus mode** — from the Focus dashboard, one task fills the screen with its
 next step and a Pomodoro timer, and nothing else. Completed focus blocks are
@@ -164,6 +173,7 @@ adhd-hw/
     │   ├── syllabusDates.ts            # date recognition, anchored to a term
     │   ├── syllabusCourseInfo.ts       # instructor, meeting times, office hours
     │   ├── schedule.ts                 # calendar grids, local-day grouping
+    │   ├── stepPlanner.ts              # spreading steps across the days left
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format
     │   ├── readerSettings.ts           # per-device reading comfort settings
@@ -235,6 +245,13 @@ A few decisions worth knowing before extending this:
 - **Assignment titles are taken from before the date, not by cutting the date
   out.** "Midterm 1 will be held on 10/07 in the usual room" splices badly;
   everything before the date is the name, everything after it is circumstance.
+- **Steps are spread across the window, not packed against the start.** The
+  point is a little every day, not a burst now and nothing after — and
+  spreading leaves the last day or two clear, which is the buffer that lets a
+  deadline survive one bad evening.
+- **A completed step stays where it was, struck through.** Making it vanish
+  the instant you succeed takes the moment away, and leaves no evidence the
+  day went well.
 - **The calendar groups by local day, never by UTC day.** A due date is
   stored as the instant of local midnight on the day the student picked, so
   grouping by UTC would shift half a term one square left for anyone west of

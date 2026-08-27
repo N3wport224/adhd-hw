@@ -2,12 +2,14 @@
 
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { cn } from "@/lib/utils";
-import type { DayCell } from "@/lib/schedule";
+import { stepsOnDay, type DayCell } from "@/lib/schedule";
 import type { Course, Task } from "@/types";
 
 interface MonthGridProps {
   cells: DayCell[];
   tasksByDay: Map<string, Task[]>;
+  /** Tasks to draw planned steps from, already filtered. */
+  stepTasks: Task[];
   courses: Course[];
   selectedDay: string | null;
   onSelectDay(dayKey: string): void;
@@ -26,6 +28,7 @@ const VISIBLE_CHIPS = 2;
 export function MonthGrid({
   cells,
   tasksByDay,
+  stepTasks,
   courses,
   selectedDay,
   onSelectDay,
@@ -47,8 +50,24 @@ export function MonthGrid({
 
       <div className="grid grid-cols-7 gap-1">
         {cells.map((cell) => {
-          const tasks = tasksByDay.get(cell.key) ?? [];
-          const open = tasks.filter((task) => task.status !== "done");
+          const steps = stepsOnDay(stepTasks, cell.key);
+          // Steps come first: a month square has room for two lines, and what
+          // to do that day is more use than what happens to be due.
+          const entries = [
+            ...steps.map((entry) => ({
+              key: entry.step.id,
+              title: entry.step.title,
+              done: entry.step.done,
+              courseId: entry.task.courseId,
+            })),
+            ...(tasksByDay.get(cell.key) ?? []).map((task) => ({
+              key: task.id,
+              title: task.title,
+              done: task.status === "done",
+              courseId: task.courseId,
+            })),
+          ];
+          const open = entries.filter((entry) => !entry.done);
 
           return (
             <button
@@ -86,15 +105,15 @@ export function MonthGrid({
                   square this size on a phone, but the colours still say
                   which courses land where. */}
               <span className="flex flex-wrap gap-0.5 px-1 sm:hidden">
-                {tasks.slice(0, 4).map((task) => {
-                  const course = courses.find((item) => item.id === task.courseId) ?? null;
+                {entries.slice(0, 4).map((entry) => {
+                  const course = courses.find((item) => item.id === entry.courseId) ?? null;
                   return (
                     <span
-                      key={task.id}
+                      key={entry.key}
                       aria-hidden="true"
                       className={cn(
                         "size-1.5 rounded-full",
-                        task.status === "done"
+                        entry.done
                           ? "bg-[var(--color-border-soft)]"
                           : course
                             ? COURSE_COLORS[course.color].accent
@@ -106,27 +125,27 @@ export function MonthGrid({
               </span>
 
               <span className="hidden flex-1 flex-col gap-0.5 sm:flex">
-                {tasks.slice(0, VISIBLE_CHIPS).map((task) => {
-                  const course = courses.find((item) => item.id === task.courseId) ?? null;
+                {entries.slice(0, VISIBLE_CHIPS).map((entry) => {
+                  const course = courses.find((item) => item.id === entry.courseId) ?? null;
                   return (
                     <span
-                      key={task.id}
+                      key={entry.key}
                       className={cn(
                         "truncate rounded px-1 py-0.5 text-[11px] leading-tight",
-                        task.status === "done"
+                        entry.done
                           ? "bg-[var(--color-surface-muted)] text-[var(--color-ink-muted)] line-through"
                           : course
                             ? COURSE_COLORS[course.color].chip
                             : "bg-[var(--color-surface-muted)]",
                       )}
                     >
-                      {task.title}
+                      {entry.title}
                     </span>
                   );
                 })}
-                {tasks.length > VISIBLE_CHIPS ? (
+                {entries.length > VISIBLE_CHIPS ? (
                   <span className="px-1 text-[11px] text-[var(--color-ink-muted)]">
-                    +{tasks.length - VISIBLE_CHIPS} more
+                    +{entries.length - VISIBLE_CHIPS} more
                   </span>
                 ) : null}
               </span>

@@ -1,4 +1,4 @@
-import type { Course, Task } from "@/types";
+import type { Course, SubTask, Task } from "@/types";
 
 /**
  * Calendar arithmetic for the schedule.
@@ -99,6 +99,58 @@ export function groupByDay(tasks: Task[]) {
   }
   for (const list of byDay.values()) {
     list.sort((a, b) => (a.dueAt ?? "").localeCompare(b.dueAt ?? "") || a.title.localeCompare(b.title));
+  }
+  return byDay;
+}
+
+/** One step of a task, placed on the day it is meant to be done. */
+export interface PlannedStep {
+  task: Task;
+  step: SubTask;
+}
+
+/**
+ * The steps planned for a given day, across every task.
+ *
+ * Deadlines say when work is due; these say when to actually do it, which is
+ * the half a calendar of due dates leaves out.
+ */
+export function stepsOnDay(tasks: Task[], dayKey: string): PlannedStep[] {
+  const planned: PlannedStep[] = [];
+  for (const task of tasks) {
+    if (task.status === "done") continue;
+    for (const step of task.subtasks) {
+      if (step.plannedFor === dayKey) planned.push({ task, step });
+    }
+  }
+  return planned;
+}
+
+/** Every step planned on or before `dayKey` and still not done. */
+export function overdueSteps(tasks: Task[], dayKey: string): PlannedStep[] {
+  const late: PlannedStep[] = [];
+  for (const task of tasks) {
+    if (task.status === "done") continue;
+    for (const step of task.subtasks) {
+      if (!step.done && step.plannedFor && step.plannedFor < dayKey) {
+        late.push({ task, step });
+      }
+    }
+  }
+  return late;
+}
+
+/** Groups planned steps by day, the way `groupByDay` does for tasks. */
+export function groupStepsByDay(tasks: Task[]) {
+  const byDay = new Map<string, PlannedStep[]>();
+  for (const task of tasks) {
+    if (task.status === "done") continue;
+    for (const step of task.subtasks) {
+      if (!step.plannedFor) continue;
+      const existing = byDay.get(step.plannedFor);
+      if (existing) existing.push({ task, step });
+      else byDay.set(step.plannedFor, [{ task, step }]);
+    }
   }
   return byDay;
 }

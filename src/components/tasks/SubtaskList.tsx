@@ -2,13 +2,54 @@
 
 import { useState } from "react";
 import { useAppData } from "@/lib/appData";
+import { dayKeyOf, toDayKey } from "@/lib/schedule";
+import { describePlan, planStepDays } from "@/lib/stepPlanner";
 import { createId, cn } from "@/lib/utils";
 import type { Task } from "@/types";
 
+function describeDay(day: string) {
+  const today = toDayKey(new Date());
+  if (day === today) return "Today";
+  const date = new Date(`${day}T00:00:00`);
+  const diff = Math.round(
+    (date.getTime() - new Date(`${today}T00:00:00`).getTime()) / 86_400_000,
+  );
+  if (diff === 1) return "Tomorrow";
+  if (diff === -1) return "Yesterday";
+  if (diff < 0) return `${Math.abs(diff)} days ago`;
+  if (diff <= 6) return date.toLocaleDateString(undefined, { weekday: "long" });
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export function SubtaskList({ task }: { task: Task }) {
-  const { toggleSubtask, setSubtasks } = useAppData();
+  const { toggleSubtask, setSubtasks, setSubtaskDay } = useAppData();
   const [newStep, setNewStep] = useState("");
   const [justCompleted, setJustCompleted] = useState<string | null>(null);
+  const [editingDay, setEditingDay] = useState<string | null>(null);
+
+  const today = toDayKey(new Date());
+  const unplanned = task.subtasks.filter((step) => !step.done && !step.plannedFor);
+
+  /**
+   * Spreads the steps that have no day across the days that are left. Offered
+   * on tasks broken down before planning existed, and after adding a step by
+   * hand — a step with no day never reaches the calendar.
+   */
+  function planRemaining() {
+    const open = task.subtasks.filter((step) => !step.done);
+    const summary = planStepDays(open.length, {
+      from: today,
+      due: task.dueAt ? dayKeyOf(task.dueAt) : null,
+      perDay: 2,
+    });
+    let position = 0;
+    setSubtasks(
+      task.id,
+      task.subtasks.map((step) =>
+        step.done ? step : { ...step, plannedFor: summary.days[position++] ?? null },
+      ),
+    );
+  }
 
   const doneCount = task.subtasks.filter((step) => step.done).length;
   // The first unfinished step is the only one that needs emphasis; the rest
@@ -29,7 +70,7 @@ export function SubtaskList({ task }: { task: Task }) {
     if (!title) return;
     setSubtasks(task.id, [
       ...task.subtasks,
-      { id: createId(), title, done: false, estimatedMinutes: null },
+      { id: createId(), title, done: false, estimatedMinutes: null, plannedFor: null },
     ]);
     setNewStep("");
   }
@@ -99,14 +140,47 @@ export function SubtaskList({ task }: { task: Task }) {
                     </span>
                   </button>
 
-                  <span
-                    className={cn(
-                      "flex-1 text-sm",
-                      step.done && "text-[var(--color-ink-muted)] line-through",
-                      step.id === nextStepId && "font-medium",
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={cn(
+                        "block text-sm",
+                        step.done && "text-[var(--color-ink-muted)] line-through",
+                        step.id === nextStepId && "font-medium",
+                      )}
+                    >
+                      {step.title}
+                    </span>
+
+                    {editingDay === step.id ? (
+                      <input
+                        type="date"
+                        autoFocus
+                        value={step.plannedFor ?? ""}
+                        onChange={(event) =>
+                          setSubtaskDay(task.id, step.id, event.target.value || null)
+                        }
+                        onBlur={() => setEditingDay(null)}
+                        aria-label={`Day for ${step.title}`}
+                        className="mt-1 rounded-lg border border-[var(--color-border-soft)] bg-[var(--color-surface)] px-2 py-1 text-xs"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setEditingDay(step.id)}
+                        className={cn(
+                          "mt-0.5 rounded px-1 text-xs transition hover:bg-[var(--color-surface-muted)]",
+                          step.done
+                            ? "text-[var(--color-ink-muted)]"
+                            : step.plannedFor === today
+                              ? "font-medium text-[var(--color-accent)]"
+                              : step.plannedFor && step.plannedFor < today
+                                ? "text-[#a8503f] dark:text-[#e29b8b]"
+                                : "text-[var(--color-ink-muted)]",
+                        )}
+                      >
+                        {step.plannedFor ? describeDay(step.plannedFor) : "No day yet"}
+                      </button>
                     )}
-                  >
-                    {step.title}
                   </span>
 
                   <button
@@ -137,6 +211,26 @@ export function SubtaskList({ task }: { task: Task }) {
             ))}
           </ul>
         </>
+      ) : null}
+
+      {unplanned.length > 0 ? (
+        <button
+          type="button"
+          onClick={planRemaining}
+          className="w-full rounded-xl bg-[var(--color-accent-wash)] px-3 py-2 text-left text-sm font-medium text-[var(--color-accent)] transition hover:brightness-95"
+        >
+          Spread the {unplanned.length === task.subtasks.filter((s) => !s.done).length ? "" : "rest "}
+          across days —{" "}
+          <span className="font-normal">
+            {describePlan(
+              planStepDays(task.subtasks.filter((step) => !step.done).length, {
+                from: today,
+                due: task.dueAt ? dayKeyOf(task.dueAt) : null,
+                perDay: 2,
+              }),
+            ).toLowerCase()}
+          </span>
+        </button>
       ) : null}
 
       <form onSubmit={handleAdd} className="flex gap-2">

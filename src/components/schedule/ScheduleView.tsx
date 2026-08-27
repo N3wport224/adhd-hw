@@ -6,10 +6,11 @@ import { useAppData } from "@/lib/appData";
 import {
   addDays,
   addMonths,
-  meetingsOnDay,
   describeMonth,
   describeWeek,
   groupByDay,
+  groupStepsByDay,
+  meetingsOnDay,
   monthGrid,
   nextDayWithWork,
   toDayKey,
@@ -39,7 +40,9 @@ export function ScheduleView() {
   const visibleTasks = useMemo(
     () =>
       data.tasks.filter((task) => {
-        if (!task.dueAt) return false;
+        // A task with planned steps belongs on the calendar even without a
+        // deadline of its own — the steps are the schedule.
+        if (!task.dueAt && !task.subtasks.some((step) => step.plannedFor)) return false;
         if (courseFilter === "all") return true;
         if (courseFilter === "unfiled") return task.courseId === null;
         return task.courseId === courseFilter;
@@ -48,6 +51,9 @@ export function ScheduleView() {
   );
 
   const tasksByDay = useMemo(() => groupByDay(visibleTasks), [visibleTasks]);
+  // Planned steps come from the same filtered set, so the course filter
+  // governs them too.
+  const stepsByDay = useMemo(() => groupStepsByDay(visibleTasks), [visibleTasks]);
 
   const meetingCourses = useMemo(
     () =>
@@ -72,6 +78,7 @@ export function ScheduleView() {
   const spanIsEmpty = [...visibleKeys].every(
     (key) =>
       (tasksByDay.get(key) ?? []).length === 0 &&
+      (stepsByDay.get(key) ?? []).length === 0 &&
       (mode !== "week" || !showMeetings || meetingsOnDay(meetingCourses, key).length === 0),
   );
   const lastVisibleKey = (mode === "week" ? days : cells).at(-1)?.key ?? toDayKey(new Date());
@@ -237,6 +244,7 @@ export function ScheduleView() {
           days={days}
           tasksByDay={tasksByDay}
           courses={data.courses}
+          stepTasks={visibleTasks}
           meetingCourses={showMeetings ? meetingCourses : []}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
@@ -246,6 +254,7 @@ export function ScheduleView() {
         <MonthGrid
           cells={cells}
           tasksByDay={tasksByDay}
+          stepTasks={visibleTasks}
           courses={data.courses}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}

@@ -88,6 +88,15 @@ export interface SubTask {
   done: boolean;
   /** Rough size, used to suggest how many pomodoros a step needs. */
   estimatedMinutes: number | null;
+  /**
+   * The day this step is meant to be done, as a local calendar day
+   * (YYYY-MM-DD).
+   *
+   * A deadline says when work is due; it never says when to start. Giving
+   * each step its own day is what turns "read four chapters by Friday" into
+   * something that shows up on a Tuesday.
+   */
+  plannedFor?: ISODateString | null;
 }
 
 export type TaskStatus = "todo" | "in_progress" | "done";

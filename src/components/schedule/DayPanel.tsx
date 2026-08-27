@@ -5,7 +5,7 @@ import { COURSE_COLORS } from "@/lib/courseStyles";
 import { cn } from "@/lib/utils";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { formatTimeRange } from "@/lib/syllabusCourseInfo";
-import { meetingsOnDay } from "@/lib/schedule";
+import { meetingsOnDay, stepsOnDay } from "@/lib/schedule";
 import type { Task } from "@/types";
 
 interface DayPanelProps {
@@ -21,9 +21,10 @@ interface DayPanelProps {
  * something you can act on rather than only look at.
  */
 export function DayPanel({ dayKey, tasks, onClose }: DayPanelProps) {
-  const { data, updateTask } = useAppData();
+  const { data, updateTask, toggleSubtask } = useAppData();
   const date = new Date(`${dayKey}T00:00:00`);
   const meetings = meetingsOnDay(data.courses, dayKey);
+  const steps = stepsOnDay(data.tasks, dayKey);
 
   return (
     <Card className="space-y-4">
@@ -70,9 +71,84 @@ export function DayPanel({ dayKey, tasks, onClose }: DayPanelProps) {
         </ul>
       ) : null}
 
+      {steps.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-muted)]">
+            To do this day
+          </p>
+          <ul className="divide-y divide-[var(--color-border-soft)]">
+            {steps.map((entry) => {
+              const course =
+                data.courses.find((item) => item.id === entry.task.courseId) ?? null;
+              return (
+                <li key={entry.step.id} className="flex items-start gap-3 py-3">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={entry.step.done}
+                    onClick={() => toggleSubtask(entry.task.id, entry.step.id)}
+                    className={cn(
+                      "mt-0.5 grid size-6 shrink-0 place-items-center rounded-md border-2 transition",
+                      entry.step.done
+                        ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+                        : "border-[var(--color-border-soft)] hover:border-[var(--color-focus)]",
+                    )}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={3.5}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className={cn("size-3.5", entry.step.done ? "opacity-100" : "opacity-0")}
+                    >
+                      <path d="m5 12.5 4.5 4.5L19 7" />
+                    </svg>
+                    <span className="sr-only">
+                      {entry.step.done ? "Mark as not done" : "Mark as done"}:{" "}
+                      {entry.step.title}
+                    </span>
+                  </button>
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cn(
+                        "text-sm",
+                        entry.step.done && "text-[var(--color-ink-muted)] line-through",
+                      )}
+                    >
+                      {entry.step.title}
+                    </p>
+                    <p className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-ink-muted)]">
+                      {course ? (
+                        <span
+                          className={cn(
+                            "rounded px-1.5 py-0.5 font-medium",
+                            COURSE_COLORS[course.color].chip,
+                          )}
+                        >
+                          {course.code || course.name}
+                        </span>
+                      ) : null}
+                      <span className="truncate">{entry.task.title}</span>
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+
       {tasks.length === 0 ? (
         <p className="text-sm text-[var(--color-ink-muted)]">
-          {meetings.length > 0 ? "Nothing due this day." : "Nothing due, no class."}
+          {steps.length > 0
+            ? "Nothing else is due this day."
+            : meetings.length > 0
+              ? "Nothing due this day."
+              : "Nothing due, no class."}
         </p>
       ) : (
         <ul className="divide-y divide-[var(--color-border-soft)]">

@@ -3,15 +3,18 @@
 import { cn } from "@/lib/utils";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { formatTimeRange } from "@/lib/syllabusCourseInfo";
-import { meetingsOnDay } from "@/lib/schedule";
+import { meetingsOnDay, stepsOnDay } from "@/lib/schedule";
 import { TaskChip } from "@/components/schedule/TaskChip";
 import type { DayCell } from "@/lib/schedule";
+import { StepChip } from "@/components/schedule/StepChip";
 import type { Course, Task } from "@/types";
 
 interface WeekGridProps {
   days: DayCell[];
   tasksByDay: Map<string, Task[]>;
   courses: Course[];
+  /** Tasks to draw planned steps from, already filtered. */
+  stepTasks: Task[];
   /** Courses whose meetings should be drawn, already filtered. */
   meetingCourses: Course[];
   selectedDay: string | null;
@@ -32,6 +35,7 @@ export function WeekGrid({
   days,
   tasksByDay,
   courses,
+  stepTasks,
   meetingCourses,
   selectedDay,
   onSelectDay,
@@ -41,7 +45,10 @@ export function WeekGrid({
     <div className="grid gap-2 sm:grid-cols-7">
       {days.map((day) => {
         const tasks = tasksByDay.get(day.key) ?? [];
-        const open = tasks.filter((task) => task.status !== "done").length;
+        const steps = stepsOnDay(stepTasks, day.key);
+        const open =
+          tasks.filter((task) => task.status !== "done").length +
+          steps.filter((entry) => !entry.step.done).length;
         const meetings = showMeetings ? meetingsOnDay(meetingCourses, day.key) : [];
 
         return (
@@ -126,6 +133,15 @@ export function WeekGrid({
             ) : null}
 
             <div className="space-y-1">
+              {/* Steps first: they are what to do today, where the task chips
+                  below are what is due. */}
+              {steps.map((entry) => (
+                <StepChip
+                  key={entry.step.id}
+                  entry={entry}
+                  course={courses.find((course) => course.id === entry.task.courseId) ?? null}
+                />
+              ))}
               {tasks.map((task) => (
                 <TaskChip
                   key={task.id}

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/lib/appData";
 import { Card, CardTitle } from "@/components/ui/Card";
+import { COURSE_COLORS } from "@/lib/courseStyles";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { TaskRow } from "@/components/focus/TaskRow";
@@ -11,7 +12,89 @@ import { QuickAddTask } from "@/components/focus/QuickAddTask";
 import { FocusMode } from "@/components/focus/FocusMode";
 import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
 import { daysUntil } from "@/lib/utils";
+import { overdueSteps, stepsOnDay, toDayKey } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
+
+/** One planned step, tickable where it is read. */
+function PlannedStepRow({
+  entry,
+  today,
+}: {
+  entry: { task: Task; step: Task["subtasks"][number] };
+  today: string;
+}) {
+  const { data, toggleSubtask } = useAppData();
+  const [justCompleted, setJustCompleted] = useState(false);
+  const course = data.courses.find((item) => item.id === entry.task.courseId) ?? null;
+  const done = entry.step.done;
+  const late = !done && !!entry.step.plannedFor && entry.step.plannedFor < today;
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl bg-[var(--color-surface)] px-3 py-3">
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={done}
+        onClick={() => {
+          if (!done) {
+            setJustCompleted(true);
+            window.setTimeout(() => setJustCompleted(false), 400);
+          }
+          toggleSubtask(entry.task.id, entry.step.id);
+        }}
+        className={cn(
+          "mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg border-2 transition",
+          done
+            ? "border-[var(--color-accent)] bg-[var(--color-accent)] text-white"
+            : "border-[var(--color-border-soft)] hover:border-[var(--color-focus)]",
+        )}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className={cn(
+            "size-4 transition-opacity",
+            done ? "opacity-100" : "opacity-0",
+            justCompleted && "animate-check-pop",
+          )}
+        >
+          <path d="m5 12.5 4.5 4.5L19 7" />
+        </svg>
+        <span className="sr-only">
+          {done ? "Mark as not done" : "Mark as done"}: {entry.step.title}
+        </span>
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <p className={cn("font-medium", done && "text-[var(--color-ink-muted)] line-through")}>
+          {entry.step.title}
+        </p>
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--color-ink-muted)]">
+          {course ? (
+            <span
+              className={cn(
+                "rounded-md px-2 py-0.5 text-xs font-medium",
+                COURSE_COLORS[course.color].chip,
+              )}
+            >
+              {course.code || course.name}
+            </span>
+          ) : null}
+          <span className="truncate">{entry.task.title}</span>
+          {late ? (
+            <span className="text-[#a8503f] dark:text-[#e29b8b]">carried over</span>
+          ) : null}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function greeting(hour: number) {
   if (hour < 5) return "Still up";
@@ -52,6 +135,16 @@ export function FocusView() {
     };
   }, [data.tasks]);
 
+  const today = toDayKey(new Date());
+  // What was planned for today, plus anything planned earlier and still open —
+  // a step that slipped should not quietly disappear.
+  const todaysSteps = useMemo(
+    () => [...overdueSteps(data.tasks, today), ...stepsOnDay(data.tasks, today)],
+    [data.tasks, today],
+  );
+  const openToday = todaysSteps.filter((entry) => !entry.step.done);
+  const doneTodayCount = todaysSteps.length - openToday.length;
+
   const nextStep = nextUp?.subtasks.find((step) => !step.done) ?? null;
   // Read from the store rather than held in state, so completing steps inside
   // focus mode re-renders it with the task's current shape.
@@ -74,14 +167,50 @@ export function FocusView() {
         <p className="max-w-prose text-[var(--color-ink-muted)]">
           {!ready
             ? "Getting your things together…"
-            : nextUp
-              ? "Here is the one thing to start with. Everything else can wait."
-              : "Nothing is due right now. That is allowed."}
+            : openToday.length > 0
+              ? "Here is what today asks of you. Nothing further ahead needs you yet."
+              : todaysSteps.length > 0
+                ? "Today's plan is done. Anything below is you working ahead."
+                : nextUp
+                  ? "Here is the one thing to start with. Everything else can wait."
+                  : "Nothing is due right now. That is allowed."}
         </p>
       </header>
 
       {ready ? (
         <>
+          {/* Planned steps come before deadlines. A deadline says when work is
+              due; a planned step is the piece of it that belongs to today,
+              which is the only question this screen is meant to answer. */}
+          {/* Gated on the day having any steps at all, not on unfinished ones.
+              Ticking off the last step should leave the line struck through
+              and the day looking finished — having the whole section vanish
+              the instant you succeed takes the moment away. */}
+          {todaysSteps.length > 0 ? (
+            <section className="space-y-4">
+              <Card className="space-y-4 border-[var(--color-focus-ring)] bg-[var(--color-accent-wash)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle>Planned for today</CardTitle>
+                  <p className="text-sm text-[var(--color-ink-muted)]">
+                    {openToday.length === 0
+                      ? "All done — that is today finished."
+                      : doneTodayCount > 0
+                        ? `${doneTodayCount} of ${todaysSteps.length} done`
+                        : `${openToday.length} to do`}
+                  </p>
+                </div>
+
+                <ul className="space-y-1">
+                  {todaysSteps.map((entry) => (
+                    <li key={entry.step.id}>
+                      <PlannedStepRow entry={entry} today={today} />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </section>
+          ) : null}
+
           <Card className="space-y-5 border-[var(--color-focus-ring)] bg-[var(--color-accent-wash)]">
             <div className="flex items-center justify-between gap-4">
               <CardTitle>Next up</CardTitle>
