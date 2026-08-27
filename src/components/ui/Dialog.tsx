@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useRef } from "react";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { cn } from "@/lib/utils";
 
 interface DialogProps {
@@ -12,9 +13,6 @@ interface DialogProps {
   onClose(): void;
   children: React.ReactNode;
 }
-
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
  * Modal built on <dialog>-like semantics without the native element, so the
@@ -29,61 +27,17 @@ export function Dialog({
   children,
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const restoreFocusTo = useRef<HTMLElement | null>(null);
-
-  const focusables = useCallback(
-    () => Array.from(panelRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []),
-    [],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-
-    restoreFocusTo.current = document.activeElement as HTMLElement | null;
-    focusables()[0]?.focus();
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab") return;
-
-      // Keep Tab inside the dialog so keyboard users can't wander into the
-      // page behind it.
-      const items = focusables();
-      if (items.length === 0) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      const active = document.activeElement;
-
-      if (event.shiftKey && active === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && active === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      restoreFocusTo.current?.focus();
-    };
-  }, [open, onClose, focusables]);
+  useFocusTrap(open, panelRef, onClose);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6">
+      {/* Out of the tab order on purpose: a full-screen invisible button is a
+          focus stop with nothing to see, and Escape already closes. */}
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Close dialog"
         onClick={onClose}
         className="absolute inset-0 bg-black/35 backdrop-blur-[2px]"

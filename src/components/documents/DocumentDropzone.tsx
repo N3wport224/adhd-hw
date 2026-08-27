@@ -154,11 +154,15 @@ export function DocumentDropzone({
           <label htmlFor={inputId} className="sr-only">
             Choose a document to upload
           </label>
+          {/* Visually hidden, and out of the tab order with it: the button
+              below is the control. Left tabbable, it is a stop where the
+              focus ring vanishes and nothing appears to have happened. */}
           <input
             ref={inputRef}
             id={inputId}
             type="file"
             multiple
+            tabIndex={-1}
             accept={ACCEPTED_EXTENSIONS.join(",")}
             disabled={busy}
             onChange={(event) => {

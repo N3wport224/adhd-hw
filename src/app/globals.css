@@ -83,6 +83,14 @@
     border-radius: 0.375rem;
   }
 
+  /* The main region is focused, not tabbed to: by the skip link, and when a
+     dialog closes after the button that opened it has gone. It spans the
+     whole page, so its ring is drawn inside its edges rather than around
+     them, where it would sit off screen. */
+  #main-content:focus-visible {
+    outline-offset: -4px;
+  }
+
   ::selection {
     background-color: var(--color-accent-soft);
   }

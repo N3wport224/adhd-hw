@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 interface MobileNavDrawerProps {
   open: boolean;
@@ -10,14 +11,11 @@ interface MobileNavDrawerProps {
 }
 
 export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // The drawer covers the page, so it needs the same focus handling a modal
+  // gets: without it, Tab walks straight past the menu into the page behind,
+  // which is invisible under the backdrop.
+  useFocusTrap(open, panelRef, onClose);
 
   if (!open) return null;
 
@@ -25,11 +23,18 @@ export function MobileNavDrawer({ open, onClose }: MobileNavDrawerProps) {
     <div className="fixed inset-0 z-40 lg:hidden">
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Close navigation menu"
         onClick={onClose}
         className="absolute inset-0 bg-black/35"
       />
-      <div className="animate-rise-fade relative h-full w-[min(19rem,85vw)] border-r border-[var(--color-border-soft)] bg-[var(--color-surface)] shadow-xl">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        className="animate-rise-fade relative h-full w-[min(19rem,85vw)] border-r border-[var(--color-border-soft)] bg-[var(--color-surface)] shadow-xl"
+      >
         <div className="absolute right-3 top-3">
           <Button
             variant="ghost"

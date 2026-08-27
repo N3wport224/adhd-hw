@@ -128,6 +128,9 @@ export function SettingsView() {
               // of its own — the button beside it is what people click, and
               // a screen reader would otherwise reach an unlabelled input.
               aria-label="Choose a backup file to import"
+              // Out of the tab order for the same reason: a stop with no
+              // visible focus ring reads as focus simply disappearing.
+              tabIndex={-1}
               className="sr-only"
               onChange={(event) => {
                 const file = event.target.files?.[0];

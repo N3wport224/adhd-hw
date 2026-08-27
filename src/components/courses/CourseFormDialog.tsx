@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
@@ -57,6 +58,25 @@ export function CourseFormDialog({
         onDelete={onDelete}
       />
     </Dialog>
+  );
+}
+
+/** The check that marks the chosen colour. Always rendered, so picking a
+ *  different swatch is a fade rather than a jump in the row's height. */
+function Tick({ shown }: { shown: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={3}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={cn("size-4 transition-opacity", shown ? "opacity-100" : "opacity-0")}
+    >
+      <path d="m5 12.5 4.5 4.5L19 7" />
+    </svg>
   );
 }
 
@@ -155,67 +175,60 @@ function CourseForm({
         )}
       </Field>
 
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">Colour</legend>
-        <div className="flex flex-wrap gap-2">
-          {COURSE_COLOR_KEYS.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setDraft({ ...draft, color: key })}
-              aria-pressed={draft.color === key}
-              aria-label={COURSE_COLORS[key].label}
-              title={COURSE_COLORS[key].label}
-              className={cn(
-                "grid size-11 place-items-center rounded-xl text-white transition",
-                "ring-offset-2 ring-offset-[var(--color-surface)]",
-                COURSE_COLORS[key].swatch,
-                draft.color === key
-                  ? "ring-2 ring-[var(--color-ink)]"
-                  : "hover:ring-2 hover:ring-[var(--color-border-soft)]",
-              )}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className={cn("size-4", draft.color === key ? "opacity-100" : "opacity-0")}
-              >
-                <path d="m5 12.5 4.5 4.5L19 7" />
-              </svg>
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <div className="space-y-3">
+        {/* The group carries its own name, so the heading beside it is
+            decoration — a legend as well would announce "Colour" twice. */}
+        <p aria-hidden="true" className="text-sm font-medium">
+          Colour
+        </p>
+        <ChoiceGroup
+          label="Colour"
+          value={draft.color}
+          onSelect={(color) => setDraft({ ...draft, color })}
+          className="flex flex-wrap gap-2"
+          choices={COURSE_COLOR_KEYS.map((key) => ({
+            value: key,
+            label: COURSE_COLORS[key].label,
+            className: COURSE_COLORS[key].swatch,
+            content: <Tick shown={draft.color === key} />,
+          }))}
+          optionClassName={(selected) =>
+            cn(
+              "grid size-11 place-items-center rounded-xl text-white transition",
+              "ring-offset-2 ring-offset-[var(--color-surface)]",
+              selected ? "ring-2 ring-[var(--color-ink)]" : "hover:ring-2 hover:ring-[var(--color-border-soft)]",
+            )
+          }
+        />
+      </div>
 
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-medium">Icon</legend>
-        <div className="flex flex-wrap gap-2">
-          {COURSE_ICON_KEYS.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setDraft({ ...draft, icon: key })}
-              aria-pressed={draft.icon === key}
-              aria-label={COURSE_ICONS[key].label}
-              title={COURSE_ICONS[key].label}
-              className={cn(
-                "grid size-11 place-items-center rounded-xl border transition",
-                "ring-offset-2 ring-offset-[var(--color-surface)]",
-                draft.icon === key
-                  ? "border-transparent bg-[var(--color-surface-muted)] ring-2 ring-[var(--color-ink)]"
-                  : "border-[var(--color-border-soft)] hover:bg-[var(--color-surface-muted)]",
-              )}
-            >
-              <CourseIcon icon={key} />
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      <div className="space-y-3">
+        {/* The group carries its own name, so the heading beside it is
+            decoration — a legend as well would announce "Icon" twice. */}
+        <p aria-hidden="true" className="text-sm font-medium">
+          Icon
+        </p>
+        <ChoiceGroup
+          label="Icon"
+          value={draft.icon}
+          onSelect={(icon) => setDraft({ ...draft, icon })}
+          className="flex flex-wrap gap-2"
+          choices={COURSE_ICON_KEYS.map((key) => ({
+            value: key,
+            label: COURSE_ICONS[key].label,
+            content: <CourseIcon icon={key} />,
+          }))}
+          optionClassName={(selected) =>
+            cn(
+              "grid size-11 place-items-center rounded-xl border transition",
+              "ring-offset-2 ring-offset-[var(--color-surface)]",
+              selected
+                ? "border-transparent bg-[var(--color-surface-muted)] ring-2 ring-[var(--color-ink)]"
+                : "border-[var(--color-border-soft)] hover:bg-[var(--color-surface-muted)]",
+            )
+          }
+        />
+      </div>
 
       <div className="flex flex-wrap items-center gap-3 pt-2">
         <Button type="submit" variant="primary" disabled={!canSave}>

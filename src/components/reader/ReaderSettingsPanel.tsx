@@ -9,6 +9,7 @@ import {
   TYPEFACE_LABELS,
   type ReaderSettings,
 } from "@/lib/readerSettings";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { cn } from "@/lib/utils";
 
 interface ReaderSettingsPanelProps {
@@ -31,30 +32,26 @@ function Choice<T extends string>({
   onSelect(next: T): void;
 }) {
   return (
-    <fieldset className="flex flex-wrap items-center gap-2">
-      <legend className="sr-only">{legend}</legend>
+    <div className="flex flex-wrap items-center gap-2">
       <span aria-hidden="true" className="w-20 text-sm text-[var(--color-ink-muted)]">
         {legend}
       </span>
-      <div className="flex flex-wrap gap-1">
-        {options.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onSelect(option)}
-            aria-pressed={value === option}
-            className={cn(
-              "min-h-9 rounded-lg px-3 text-sm font-medium transition",
-              value === option
-                ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
-            )}
-          >
-            {labels[option]}
-          </button>
-        ))}
-      </div>
-    </fieldset>
+      <ChoiceGroup
+        label={legend}
+        choices={options.map((option) => ({ value: option, label: labels[option] }))}
+        value={value}
+        onSelect={onSelect}
+        className="flex flex-wrap gap-1"
+        optionClassName={(selected) =>
+          cn(
+            "min-h-9 rounded-lg px-3 text-sm font-medium transition",
+            selected
+              ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+              : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
+          )
+        }
+      />
+    </div>
   );
 }
 

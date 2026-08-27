@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { describePlan, planStepDays } from "@/lib/stepPlanner";
 import { toDayKey } from "@/lib/schedule";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { cn } from "@/lib/utils";
 
 interface PlanAcrossDaysProps {
@@ -80,22 +81,21 @@ export function PlanAcrossDays({
         <>
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-[var(--color-ink-muted)]">About</span>
-            {PACES.map((pace) => (
-              <button
-                key={pace}
-                type="button"
-                onClick={() => setPerDay(pace)}
-                aria-pressed={perDay === pace}
-                className={cn(
+            <ChoiceGroup
+              label="Steps a day"
+              choices={PACES.map((pace) => ({ value: String(pace), label: String(pace) }))}
+              value={String(perDay)}
+              onSelect={(next) => setPerDay(Number(next))}
+              className="flex gap-2"
+              optionClassName={(selected) =>
+                cn(
                   "min-h-9 rounded-lg px-3 text-sm font-medium transition",
-                  perDay === pace
+                  selected
                     ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
                     : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]",
-                )}
-              >
-                {pace}
-              </button>
-            ))}
+                )
+              }
+            />
             <span className="text-sm text-[var(--color-ink-muted)]">a day</span>
 
             <label className="ml-auto flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">

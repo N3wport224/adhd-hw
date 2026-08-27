@@ -17,6 +17,7 @@ import {
   weekDays,
   type ScheduleMode,
 } from "@/lib/schedule";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { cn } from "@/lib/utils";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -184,28 +185,24 @@ export function ScheduleView() {
         </Button>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <div
-            role="group"
-            aria-label="View"
+          <ChoiceGroup<ScheduleMode>
+            label="View"
+            choices={[
+              { value: "week", label: "Week" },
+              { value: "month", label: "Month" },
+            ]}
+            value={mode}
+            onSelect={setMode}
             className="flex rounded-xl border border-[var(--color-border-soft)] p-0.5"
-          >
-            {(["week", "month"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setMode(option)}
-                aria-pressed={mode === option}
-                className={cn(
-                  "min-h-9 rounded-lg px-3 text-sm font-medium capitalize transition",
-                  mode === option
-                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                    : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
-                )}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
+            optionClassName={(selected) =>
+              cn(
+                "min-h-9 rounded-lg px-3 text-sm font-medium transition",
+                selected
+                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                  : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
+              )
+            }
+          />
 
           {mode === "week" && data.courses.some((c) => c.meetingPattern?.days.length) ? (
             <label className="flex items-center gap-2 text-sm text-[var(--color-ink-muted)]">
@@ -258,6 +255,7 @@ export function ScheduleView() {
           courses={data.courses}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
+          label={describeMonth(anchor)}
         />
       )}
 

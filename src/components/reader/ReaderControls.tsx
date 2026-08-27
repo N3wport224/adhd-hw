@@ -1,6 +1,7 @@
 "use client";
 
 import { PLAYBACK_RATES, type PlaybackRate, type SpeechReader } from "@/lib/speech";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { cn } from "@/lib/utils";
 
 interface Section {
@@ -163,30 +164,29 @@ export function ReaderControls({
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-        <fieldset className="flex items-center gap-2">
-          <legend className="sr-only">Playback speed</legend>
+        <div className="flex items-center gap-2">
           <span aria-hidden="true" className="text-sm text-[var(--color-ink-muted)]">
             Speed
           </span>
-          <div className="flex gap-1">
-            {PLAYBACK_RATES.map((rate) => (
-              <button
-                key={rate}
-                type="button"
-                onClick={() => reader.setRate(rate as PlaybackRate)}
-                aria-pressed={reader.rate === rate}
-                className={cn(
-                  "min-h-9 rounded-lg px-3 text-sm font-medium transition",
-                  reader.rate === rate
-                    ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
-                    : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
-                )}
-              >
-                {rate}×
-              </button>
-            ))}
-          </div>
-        </fieldset>
+          <ChoiceGroup
+            label="Playback speed"
+            choices={PLAYBACK_RATES.map((rate) => ({
+              value: String(rate),
+              label: `${rate}×`,
+            }))}
+            value={String(reader.rate)}
+            onSelect={(next) => reader.setRate(Number(next) as PlaybackRate)}
+            className="flex gap-1"
+            optionClassName={(selected) =>
+              cn(
+                "min-h-9 rounded-lg px-3 text-sm font-medium transition",
+                selected
+                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                  : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
+              )
+            }
+          />
+        </div>
 
         {reader.voices.length > 0 ? (
           <div className="flex items-center gap-2">
