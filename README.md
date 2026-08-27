@@ -295,6 +295,14 @@ A few decisions worth knowing before extending this:
   runs to megabytes; localStorage's ~5MB budget would start rejecting uploads
   first. Existing localStorage data is migrated on first load, and a failed
   write surfaces as a banner rather than being swallowed.
+- **Documents are stored apart from everything else, and only what changed is
+  written.** Courses and tasks are small and change constantly; readings are
+  large and almost never change. Keeping them in one record meant ticking a
+  checkbox re-serialised every reading ever imported — measured at 12ms with
+  5MB of documents, 75ms at 27MB and 200ms at 71MB, growing with material
+  that had nothing to do with what changed. Split into their own object
+  store, with reference equality deciding which documents need writing, the
+  cost is flat: about 1ms at any size.
 
 ## Known limits
 
