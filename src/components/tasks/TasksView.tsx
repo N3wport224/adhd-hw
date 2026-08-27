@@ -10,6 +10,7 @@ import { controlClass } from "@/components/ui/Field";
 import { QuickAddTask } from "@/components/focus/QuickAddTask";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
+import { EditTaskDialog } from "@/components/tasks/EditTaskDialog";
 import type { Task } from "@/types";
 
 type Bucket = "overdue" | "today" | "week" | "later" | "someday";
@@ -45,6 +46,7 @@ export function TasksView() {
   const [courseFilter, setCourseFilter] = useState("all");
   const [showDone, setShowDone] = useState(false);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [collapsed, setCollapsed] = useState<Bucket[]>(COLLAPSED_BY_DEFAULT);
 
   const { buckets, doneTasks } = useMemo(() => {
@@ -190,6 +192,7 @@ export function TasksView() {
                     <TaskCard
                       task={task}
                       onBreakDown={setBreakdownTask}
+                onEdit={setEditingTask}
                       defaultExpanded={position === 0 && bucket !== "later" && bucket !== "someday"}
                     />
                   </li>
@@ -206,7 +209,8 @@ export function TasksView() {
           <ul className="space-y-3">
             {doneTasks.map((task) => (
               <li key={task.id}>
-                <TaskCard task={task} onBreakDown={setBreakdownTask} />
+                <TaskCard task={task} onBreakDown={setBreakdownTask}
+                onEdit={setEditingTask} />
               </li>
             ))}
           </ul>
@@ -219,6 +223,12 @@ export function TasksView() {
           <QuickAddTask />
         </div>
       </section>
+
+      <EditTaskDialog
+        open={editingTask !== null}
+        task={editingTask}
+        onClose={() => setEditingTask(null)}
+      />
 
       <BreakdownDialog
         open={breakdownTask !== null}

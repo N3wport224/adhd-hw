@@ -56,7 +56,7 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 148 cases
+npm test           # node:test over the pure logic — 153 cases
 ```
 
 ## What it does
@@ -116,7 +116,9 @@ optional. A deadline says when work is finished and nothing about when to
 start, which is how a week of runway becomes one bad Thursday night. Each
 step gets its own day, so a chapter due Friday puts something small on today.
 Steps already written can be spread the same way, and any single step's day
-can be changed by hand.
+can be changed by hand. Assignments can be edited after the fact — title,
+course, due date and notes — and moving a due date offers to spread the
+remaining steps again, since the old days no longer fit.
 
 **Focus mode** — from the Focus dashboard, one task fills the screen with its
 next step and a Pomodoro timer, and nothing else. Completed focus blocks are
@@ -249,6 +251,14 @@ A few decisions worth knowing before extending this:
   point is a little every day, not a burst now and nothing after — and
   spreading leaves the last day or two clear, which is the buffer that lets a
   deadline survive one bad evening.
+- **Falling behind is the ordinary case, and the app absorbs it.** Steps that
+  slipped past their day are carried onto today rather than hidden, and one
+  button re-spreads whatever is left over the days that remain. A plan still
+  pointing at days that have gone is not a plan; it is a list of failures to
+  scroll past.
+- **Only a few slipped steps are shown, with the true count stated.** A bad
+  week must not turn the one screen built to show a single next thing into
+  the wall of everything it exists to prevent.
 - **A completed step stays where it was, struck through.** Making it vanish
   the instant you succeed takes the moment away, and leaves no evidence the
   day went well.

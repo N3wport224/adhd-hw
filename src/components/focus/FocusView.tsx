@@ -12,9 +12,75 @@ import { QuickAddTask } from "@/components/focus/QuickAddTask";
 import { FocusMode } from "@/components/focus/FocusMode";
 import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
 import { daysUntil } from "@/lib/utils";
-import { overdueSteps, stepsOnDay, toDayKey } from "@/lib/schedule";
+import { dayKeyOf, overdueSteps, stepsOnDay, toDayKey } from "@/lib/schedule";
+import { describePlan, planStepDays, replanOpenSteps } from "@/lib/stepPlanner";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
+
+/**
+ * The way out of a plan that has gone stale.
+ *
+ * Falling behind is the ordinary case for this audience, and a plan still
+ * pointing at days that have gone stops being a plan and becomes a list of
+ * failures to scroll past. One button re-spreads whatever is left over the
+ * days that actually remain.
+ */
+function CatchUp({
+  taskIds,
+  count,
+  onDone,
+}: {
+  taskIds: string[];
+  count: number;
+  onDone(): void;
+}) {
+  const { data, setSubtasks } = useAppData();
+  const today = toDayKey(new Date());
+
+  const tasks = data.tasks.filter((task) => taskIds.includes(task.id));
+  const openCount = tasks.reduce(
+    (total, task) => total + task.subtasks.filter((step) => !step.done).length,
+    0,
+  );
+  const preview = planStepDays(openCount, {
+    from: today,
+    due: null,
+    perDay: 2,
+  });
+
+  function catchUp() {
+    for (const task of tasks) {
+      setSubtasks(
+        task.id,
+        replanOpenSteps(task.subtasks, {
+          from: today,
+          due: task.dueAt ? dayKeyOf(task.dueAt) : null,
+          perDay: 2,
+        }),
+      );
+    }
+    onDone();
+  }
+
+  return (
+    <div className="space-y-2 rounded-xl bg-[var(--color-surface)] p-4">
+      <p className="text-sm">
+        <span className="font-medium">
+          {count} {count === 1 ? "step" : "steps"} slipped past {count === 1 ? "its" : "their"} day.
+        </span>{" "}
+        <span className="text-[var(--color-ink-muted)]">
+          That happens. Move what is left onto the days you still have.
+        </span>
+      </p>
+      <Button variant="secondary" onClick={catchUp}>
+        Re-spread from today
+      </Button>
+      <p className="text-xs text-[var(--color-ink-muted)]">
+        {describePlan(preview)} Anything already finished keeps the day it was done.
+      </p>
+    </div>
+  );
+}
 
 /** One planned step, tickable where it is read. */
 function PlannedStepRow({
@@ -114,6 +180,7 @@ function byUrgency(a: Task, b: Task) {
 export function FocusView() {
   const { data, ready, updateTask } = useAppData();
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  const [caughtUp, setCaughtUp] = useState(false);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
 
   const { nextUp, dueToday, laterCount, doneToday } = useMemo(() => {
@@ -136,14 +203,31 @@ export function FocusView() {
   }, [data.tasks]);
 
   const today = toDayKey(new Date());
-  // What was planned for today, plus anything planned earlier and still open —
-  // a step that slipped should not quietly disappear.
-  const todaysSteps = useMemo(
-    () => [...overdueSteps(data.tasks, today), ...stepsOnDay(data.tasks, today)],
-    [data.tasks, today],
-  );
+  /**
+   * What was planned for today, plus a few that slipped.
+   *
+   * A step that slipped must not quietly disappear — but neither should a bad
+   * week turn this screen into the wall of everything it exists to prevent.
+   * The full count is stated below and the whole list is on Tasks; here, a
+   * handful is enough to make the point.
+   */
+  const CARRIED_SHOWN = 3;
+  const { todaysSteps, carriedHidden } = useMemo(() => {
+    const carried = overdueSteps(data.tasks, today);
+    return {
+      todaysSteps: [...carried.slice(0, CARRIED_SHOWN), ...stepsOnDay(data.tasks, today)],
+      carriedHidden: Math.max(0, carried.length - CARRIED_SHOWN),
+    };
+  }, [data.tasks, today]);
   const openToday = todaysSteps.filter((entry) => !entry.step.done);
   const doneTodayCount = todaysSteps.length - openToday.length;
+
+  // Tasks with steps that were meant to happen before today and did not.
+  const slippedTaskIds = useMemo(
+    () => [...new Set(overdueSteps(data.tasks, today).map((entry) => entry.task.id))],
+    [data.tasks, today],
+  );
+  const slippedCount = overdueSteps(data.tasks, today).length;
 
   const nextStep = nextUp?.subtasks.find((step) => !step.done) ?? null;
   // Read from the store rather than held in state, so completing steps inside
@@ -207,6 +291,36 @@ export function FocusView() {
                     </li>
                   ))}
                 </ul>
+
+                {carriedHidden > 0 ? (
+                  <p className="text-sm text-[var(--color-ink-muted)]">
+                    {carriedHidden} more slipped {carriedHidden === 1 ? "step is" : "steps are"}{" "}
+                    not shown.{" "}
+                    <Link href="/tasks" className="underline underline-offset-4">
+                      See them all
+                    </Link>
+                    .
+                  </p>
+                ) : null}
+
+                {/* The confirmation lives here rather than inside CatchUp:
+                    re-spreading is what makes the slip go away, so a message
+                    owned by the prompt would unmount at the exact moment it
+                    had something to say. */}
+                {slippedCount > 0 ? (
+                  <CatchUp
+                    taskIds={slippedTaskIds}
+                    count={slippedCount}
+                    onDone={() => setCaughtUp(true)}
+                  />
+                ) : caughtUp ? (
+                  <p
+                    role="status"
+                    className="animate-rise-fade rounded-xl bg-[var(--color-surface)] p-4 text-sm text-[var(--color-ink-muted)]"
+                  >
+                    Re-spread from today. Nothing is behind any more.
+                  </p>
+                ) : null}
               </Card>
             </section>
           ) : null}

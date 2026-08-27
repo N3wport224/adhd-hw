@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { describePlan, planStepDays } from "@/lib/stepPlanner";
+import { describePlan, planStepDays, replanOpenSteps, slippedSteps } from "@/lib/stepPlanner";
 
 // 2026-08-31 is a Monday, so weekend handling is exercised within one window.
 const MONDAY = "2026-08-31";
@@ -115,5 +115,63 @@ test("describes the plan in words", () => {
   assert.match(
     describePlan(planStepDays(5, { from: MONDAY, due: null, perDay: 2 })),
     /over 3 days\.$/,
+  );
+});
+
+const steps = (spec: Array<[string, string | null, boolean]>) =>
+  spec.map(([title, plannedFor, done], index) => ({
+    id: `s${index}`,
+    title,
+    done,
+    estimatedMinutes: null,
+    plannedFor,
+  }));
+
+test("re-planning moves only what is unfinished", () => {
+  const before = steps([
+    ["Done early", "2026-08-20", true],
+    ["Slipped", "2026-08-25", false],
+    ["Also slipped", "2026-08-26", false],
+  ]);
+  const after = replanOpenSteps(before, { from: MONDAY, due: NEXT_FRIDAY, perDay: 1 });
+
+  // The finished step keeps the day it was actually done on.
+  assert.equal(after[0].plannedFor, "2026-08-20");
+  assert.ok(after[1].plannedFor! >= MONDAY);
+  assert.ok(after[2].plannedFor! >= MONDAY);
+});
+
+test("re-planning starts today, so something lands now", () => {
+  const after = replanOpenSteps(
+    steps([["One", "2026-08-01", false], ["Two", "2026-08-02", false]]),
+    { from: MONDAY, due: NEXT_FRIDAY, perDay: 1 },
+  );
+  assert.equal(after[0].plannedFor, MONDAY);
+});
+
+test("re-planning keeps every step and its titles", () => {
+  const before = steps([["A", null, false], ["B", null, true], ["C", null, false]]);
+  const after = replanOpenSteps(before, { from: MONDAY, due: NEXT_FRIDAY, perDay: 2 });
+  assert.deepEqual(after.map((step) => step.title), ["A", "B", "C"]);
+  assert.deepEqual(after.map((step) => step.id), ["s0", "s1", "s2"]);
+});
+
+test("re-planning a finished task changes nothing", () => {
+  const before = steps([["A", "2026-08-01", true], ["B", "2026-08-02", true]]);
+  const after = replanOpenSteps(before, { from: MONDAY, due: NEXT_FRIDAY, perDay: 1 });
+  assert.deepEqual(after, before);
+});
+
+test("finds the steps that have slipped", () => {
+  const list = steps([
+    ["Missed", "2026-08-25", false],
+    ["Missed but done", "2026-08-25", true],
+    ["Today", MONDAY, false],
+    ["Ahead", "2026-09-05", false],
+    ["No day", null, false],
+  ]);
+  assert.deepEqual(
+    slippedSteps(list, MONDAY).map((step) => step.title),
+    ["Missed"],
   );
 });

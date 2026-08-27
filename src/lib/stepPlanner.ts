@@ -1,4 +1,5 @@
 import { addDays, toDayKey } from "@/lib/schedule";
+import type { SubTask } from "@/types";
 
 /**
  * Spreading the steps of a task across the days it has left.
@@ -112,6 +113,31 @@ export function planStepDays(count: number, options: PlanOptions): PlanSummary {
     daysSpare,
     crowded: busiestDay > perDay,
   };
+}
+
+/**
+ * Re-spreads whatever is still unfinished, from today.
+ *
+ * Falling behind is the normal case, not the exception, and a plan that keeps
+ * pointing at days that have already gone is worse than no plan — it becomes
+ * a list of failures to scroll past. Finished steps keep their day, because
+ * they record what actually happened.
+ */
+export function replanOpenSteps(subtasks: SubTask[], options: PlanOptions): SubTask[] {
+  const open = subtasks.filter((step) => !step.done);
+  const { days } = planStepDays(open.length, options);
+
+  let position = 0;
+  return subtasks.map((step) =>
+    step.done ? step : { ...step, plannedFor: days[position++] ?? null },
+  );
+}
+
+/** Steps whose day has passed and which are still not done. */
+export function slippedSteps(subtasks: SubTask[], today: string) {
+  return subtasks.filter(
+    (step) => !step.done && !!step.plannedFor && step.plannedFor < today,
+  );
 }
 
 /** "2 a day for 4 days, finishing 2 days early" */

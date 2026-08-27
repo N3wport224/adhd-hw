@@ -14,6 +14,7 @@ import { CourseFormDialog } from "@/components/courses/CourseFormDialog";
 import { QuickAddTask } from "@/components/focus/QuickAddTask";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
+import { EditTaskDialog } from "@/components/tasks/EditTaskDialog";
 import { DocumentDropzone } from "@/components/documents/DocumentDropzone";
 import { DocumentRow } from "@/components/documents/DocumentRow";
 import { GradingBreakdown } from "@/components/courses/GradingBreakdown";
@@ -31,6 +32,7 @@ export function CourseDetail({ courseId }: { courseId: string }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [scanning, setScanning] = useState<StudyDocument | null>(null);
   const [scanSummary, setScanSummary] = useState<ScanSummary | null>(null);
 
@@ -134,7 +136,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
           <ul className="space-y-3">
             {tasks.map((task) => (
               <li key={task.id}>
-                <TaskCard task={task} onBreakDown={setBreakdownTask} />
+                <TaskCard task={task} onBreakDown={setBreakdownTask}
+                onEdit={setEditingTask} />
               </li>
             ))}
           </ul>
@@ -213,6 +216,12 @@ export function CourseDetail({ courseId }: { courseId: string }) {
           setScanning(null);
           setScanSummary(summary);
         }}
+      />
+
+      <EditTaskDialog
+        open={editingTask !== null}
+        task={editingTask}
+        onClose={() => setEditingTask(null)}
       />
 
       <BreakdownDialog

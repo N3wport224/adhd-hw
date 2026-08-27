@@ -11,11 +11,18 @@ import type { Task } from "@/types";
 interface TaskCardProps {
   task: Task;
   onBreakDown(task: Task): void;
+  /** Absent where there is nowhere sensible to open a dialog from. */
+  onEdit?(task: Task): void;
   /** Open by default for the task the user is most likely acting on. */
   defaultExpanded?: boolean;
 }
 
-export function TaskCard({ task, onBreakDown, defaultExpanded = false }: TaskCardProps) {
+export function TaskCard({
+  task,
+  onBreakDown,
+  onEdit,
+  defaultExpanded = false,
+}: TaskCardProps) {
   const { data, updateTask, removeTask } = useAppData();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [justCompleted, setJustCompleted] = useState(false);
@@ -74,6 +81,11 @@ export function TaskCard({ task, onBreakDown, defaultExpanded = false }: TaskCar
           <p className={cn("font-medium", done && "text-[var(--color-ink-muted)] line-through")}>
             {task.title}
           </p>
+          {task.notes ? (
+            <p className="mt-1 whitespace-pre-line text-sm text-[var(--color-ink-muted)]">
+              {task.notes}
+            </p>
+          ) : null}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--color-ink-muted)]">
             {course ? (
               <span
@@ -101,6 +113,28 @@ export function TaskCard({ task, onBreakDown, defaultExpanded = false }: TaskCar
             ) : null}
           </p>
         </div>
+
+        {onEdit && !confirmingDelete ? (
+          <button
+            type="button"
+            onClick={() => onEdit(task)}
+            aria-label={`Edit ${task.title}`}
+            className="grid size-9 shrink-0 place-items-center rounded-lg text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.6}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="size-4"
+            >
+              <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17v3Z" />
+            </svg>
+          </button>
+        ) : null}
 
         {/* Deleting takes two taps. Losing an assignment to a mis-tap is a
             far worse outcome here than one extra confirmation. */}
