@@ -25,7 +25,9 @@ no `.env` file — everything runs in the browser and stores its data there.
 1. **Courses → Add your first course.** Give it a name and a colour.
 2. **Open the course and drop a syllabus on it** (PDF or Word). It parses, then
    opens a review panel. Check the term start date first — every bare date like
-   "Oct 12" depends on it. Then *Select all* → *Add*.
+   "Oct 12" depends on it. Then *Select all* → *Add*. Leave **Add a lectures
+   task for each week of term** ticked and every week of the course gets one,
+   with a step on each class day.
 3. **Schedule.** Your deadlines are now on a calendar, coloured by course. If
    the current week is empty it will point you at the next week that isn't.
 4. **Library → drop in a reading**, open it, and press play. Space plays and
@@ -38,10 +40,14 @@ no `.env` file — everything runs in the browser and stores its data there.
 
 ### Accessibility
 
-Audited with axe-core across every page in both themes, plus the dialogs:
-zero violations at WCAG 2.1 AA. The colour tokens are guarded by unit tests
-that compute contrast ratios from the stylesheet itself, so a colour change
-that breaks a pair fails the build rather than shipping.
+Audited with axe-core across every page in both themes, plus the dialogs, the
+month calendar and completed work: zero violations at WCAG 2.1 AA. The colour
+tokens are guarded by unit tests that compute contrast ratios from the
+stylesheet itself, so a colour change that breaks a pair fails the build
+rather than shipping.
+
+Separately walked with nothing but a keyboard, which is the part axe cannot
+check: every screen can be driven, and every task finished, without a pointer.
 
 ### If something goes wrong
 
@@ -63,14 +69,14 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 157 cases
+npm test           # node:test over the pure logic — 173 cases
 ```
 
 ## What it does
 
-**Courses** (`/courses`) — add, edit and delete courses with a colour and
-icon. Each course has a detail page holding its tasks, its syllabus, and its
-readings.
+**Courses** (`/courses`) — add, edit and delete courses with a colour, an icon
+and the term's first and last day. Each course has a detail page holding its
+tasks, its syllabus, its weekly lectures and its readings.
 
 **Documents** — drag and drop `.pdf`, `.docx`, `.txt` or `.md` onto a course
 page and the file is bound to that course as it is parsed. Text extraction is
@@ -127,6 +133,16 @@ can be changed by hand. Assignments can be edited after the fact — title,
 course, due date and notes — and moving a due date offers to spread the
 remaining steps again, since the old days no longer fit.
 
+**Weekly lectures** — the one piece of coursework nothing writes down as a
+deadline, and so the first to quietly slide. Given a term and the days a class
+meets, each week of term becomes a single task ("Week 6 lectures") with a step
+for each class, already carrying the day it happens. Tick one off from the
+calendar, from Focus, or from the task itself. Offered as a checkbox during a
+syllabus scan, and available any time from **Weekly lectures** on the course
+page — including for a course with no meeting days, which gets one step a week
+for watching the recordings. Adding again only fills in the weeks that are
+missing, so extending a term tops it up rather than duplicating it.
+
 **Focus mode** — from the Focus dashboard, one task fills the screen with its
 next step and a Pomodoro timer, and nothing else. Completed focus blocks are
 counted against the task.
@@ -137,9 +153,13 @@ present, so importing the same file twice is safe. Also asks the browser for
 durable storage, which is what stops it clearing your data to make room for
 other sites.
 
-**Throughout** — dark/light mode applied before first paint, keyboard support
-everywhere, motion that respects `prefers-reduced-motion`, and persistence in
-IndexedDB behind a `DataStore` interface.
+**Throughout** — dark/light mode applied before first paint, motion that
+respects `prefers-reduced-motion`, and persistence in IndexedDB behind a
+`DataStore` interface. Every task can be completed from the keyboard alone: a
+skip link, focus that is trapped inside dialogs and the mobile menu and
+returns where it started when they close, one-of-several pickers as radio
+groups moved with arrow keys, and a month calendar that navigates a day at a
+time with the arrows and a week at a time with up and down.
 
 ## File tree
 
@@ -159,7 +179,7 @@ adhd-hw/
     │   ├── layout/                     # AppShell, Sidebar, TopBar, drawer,
     │   │                               #   ThemeToggle, SaveErrorBanner
     │   ├── courses/                    # CourseCard/Detail/FormDialog/Grid/Icon,
-    │   │                               #   GradingBreakdown
+    │   │                               #   GradingBreakdown, LecturePlanner
     │   ├── syllabus/                   # SyllabusScanner, SyllabusReviewModal
     │   ├── documents/                  # DocumentDropzone, DocumentRow, LibraryView
     │   ├── reader/                     # ReaderView, ReaderControls, ReaderPane,
@@ -171,7 +191,8 @@ adhd-hw/
     │   │                               #   BreakdownDialog
     │   ├── focus/                      # FocusView, FocusMode, PomodoroTimer,
     │   │                               #   QuickAddTask, TaskRow
-    │   └── ui/                         # Button, Card, Dialog, Field, EmptyState
+    │   └── ui/                         # Button, Card, ChoiceGroup, Dialog,
+    │                                   #   Field, EmptyState
     ├── lib/
     │   ├── appData.tsx                 # context + reducers over AppData
     │   ├── storage.ts                  # DataStore interface, IndexedDB adapter
@@ -183,6 +204,8 @@ adhd-hw/
     │   ├── syllabusCourseInfo.ts       # instructor, meeting times, office hours
     │   ├── schedule.ts                 # calendar grids, local-day grouping
     │   ├── stepPlanner.ts              # spreading steps across the days left
+    │   ├── lecturePlan.ts              # a term of weekly lecture tasks
+    │   ├── useFocusTrap.ts             # focus handling shared by every overlay
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format
     │   ├── readerSettings.ts           # per-device reading comfort settings
@@ -250,10 +273,28 @@ A few decisions worth knowing before extending this:
   "Oct 12" and "Week 4" with no year. A Fall syllabus saying "Jan 20" means
   the following January, and the only way to know that is the term anchor —
   which is why it is the first thing the review modal asks about.
-- **Class meetings are a rule, not rows.** A weekly class is computed from a
-  pattern and the term bounds at render time. Expanding it into a record per
-  week would put hundreds of near-identical rows in storage, all needing
-  revision the moment a room changes.
+- **Class meetings are a rule, not rows — lectures to attend are rows.** The
+  block drawn on the calendar is computed from the pattern and the term bounds
+  at render time, because expanding it into a record per week would put
+  hundreds of near-identical rows in storage, all needing revision the moment
+  a room changes. The thing you tick off is different: it carries state, so it
+  has to be stored. One task a week with a step per class, not one task per
+  class — three sessions across five courses is fifteen list items, which is
+  the wall this app exists to avoid.
+- **Nothing dims live text with opacity.** Fading a whole element is the
+  quickest way to put its text under 4.5:1, and it did, three times: the days
+  either side of a month, the parent title under a calendar step, and a
+  completed task card. Set something back with a duller ground or a smaller
+  size instead. Done is not the same as unreadable.
+- **An overlay's focus goes somewhere when it closes.** Focus returns to
+  whatever opened it — unless that thing is gone, which happens whenever the
+  empty state that held the button is replaced by the thing it created.
+  Focusing a detached node silently drops focus on `<body>`, so the fallback
+  is the main region, which has a focus ring for exactly this.
+- **A picker with more than a few options is a radio group.** Eight colours,
+  eight icons and forty-two days in a month were sixty tab stops between the
+  top of a screen and the button at the bottom of it. Roving tabindex makes
+  each one stop, and arrow keys the way to move inside it.
 - **A meridiem carries forward, never back.** "11:00 to 1:00pm" starts in the
   morning; borrowing the pm would move it to eleven at night. "2-4pm" is the
   exception and is handled by plausibility — no class starts at two in the
@@ -332,8 +373,8 @@ A few decisions worth knowing before extending this:
 
 ## Next up
 
-1. Recurring items, so "problem set due every Friday" becomes twelve tasks
-   rather than one.
+1. Recurring assignments, so "problem set due every Friday" becomes twelve
+   tasks rather than one — the way a term of lectures already does.
 2. Separate lab and section times per course.
 3. A Supabase `DataStore` adapter plus auth, so data follows the student
    across devices.

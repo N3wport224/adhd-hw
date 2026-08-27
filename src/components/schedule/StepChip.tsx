@@ -71,7 +71,9 @@ export function StepChip({ entry, course }: { entry: PlannedStep; course: Course
 
       <span className={cn("min-w-0 flex-1", done && "line-through")}>
         <span className="line-clamp-2">{entry.step.title}</span>
-        <span className="block truncate opacity-70">{entry.task.title}</span>
+        {/* Set back by size, not by transparency: at 70% opacity this line
+            fell under the contrast floor on the lighter course colours. */}
+        <span className="block truncate text-[11px]">{entry.task.title}</span>
       </span>
     </div>
   );

@@ -166,7 +166,14 @@ export interface Meeting {
 /** How long a term runs when a course has no end date set. */
 const DEFAULT_TERM_MONTHS = 4;
 
-function termBounds(course: Course) {
+/**
+ * The span a course's weekly rules apply over.
+ *
+ * A term start with no end is common — syllabi say when a course begins far
+ * more often than when it stops — so the end is assumed rather than left
+ * open, which would repeat a Tuesday class for ever.
+ */
+export function termBounds(course: Course) {
   if (!course.termStart) return null;
   const start = course.termStart;
   const end =

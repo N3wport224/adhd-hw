@@ -92,6 +92,47 @@ test("pulls instructor, meeting pattern and office hours off a syllabus", () => 
   assert.match(details.officeHours ?? "", /Tue and Thu/);
 });
 
+test("reads the labels a timetable actually uses", () => {
+  // Every one of these lost its class times before: the plural labels did not
+  // match, and "Wednesdays" was not a weekday.
+  const cases: Array<[string, number[], string]> = [
+    ["Lectures: Mon, Wed, Fri 10:00-11:15, Moore 110", [1, 3, 5], "Moore 110"],
+    ["Seminars: Wednesdays 3:00-5:00pm, Haldeman 41", [3], "Haldeman 41"],
+    ["Classes: Tue/Thu 11:00-12:15", [2, 4], ""],
+    ["Lectures MWF 9-9:50am Rockefeller 3", [1, 3, 5], "Rockefeller 3"],
+    ["Meeting times: TuTh 2-3:15pm, Baker 23", [2, 4], "Baker 23"],
+  ];
+
+  for (const [line, days, location] of cases) {
+    const pattern = parseCourseDetails([line]).meetingPattern;
+    assert.deepEqual(pattern?.days, days, line);
+    assert.equal(pattern?.location, location, line);
+  }
+});
+
+test("finds the room when extraction ran the next line into the meeting line", () => {
+  // A syllabus that writes its headings in bold at body size gives one
+  // paragraph, not two, so the room is mid-line rather than at the end.
+  const pattern = parseCourseDetails([
+    "Lectures: Mon, Wed, Fri 10:00-11:15, Moore 110 Course description This course surveys attention.",
+  ]).meetingPattern;
+  assert.equal(pattern?.location, "Moore 110");
+});
+
+test("does not read whatever followed the time as a room", () => {
+  for (const line of [
+    "Lectures: Mon, Wed, Fri 10:00-11:15 Week 6 begins here",
+    "Class meets Tue 2-4pm and covers Chapter 3 of the text",
+  ]) {
+    assert.equal(parseCourseDetails([line]).meetingPattern?.location, "", line);
+  }
+});
+
+test("does not read a weekday at the end of a line as a room", () => {
+  const pattern = parseCourseDetails(["Lectures: 10:00-11:15 Monday"]).meetingPattern;
+  assert.equal(pattern?.location, "");
+});
+
 test("does not mistake office hours for when the class meets", () => {
   const details = parseCourseDetails([
     "Office hours: Wednesday 2-4pm, Kemeny 318.",

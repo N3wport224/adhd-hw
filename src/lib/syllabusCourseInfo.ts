@@ -16,14 +16,15 @@ export interface CourseDetails {
   officeHours: string | null;
 }
 
+/** Plural too: a syllabus says "Wednesdays" as readily as "Wednesday". */
 const DAY_WORDS: Array<{ pattern: RegExp; day: Weekday }> = [
-  { pattern: /^sun(day)?$/i, day: 0 },
-  { pattern: /^mon(day)?$/i, day: 1 },
-  { pattern: /^tues?(day)?$/i, day: 2 },
-  { pattern: /^wed(nes)?(day)?$/i, day: 3 },
-  { pattern: /^thur?s?(day)?$/i, day: 4 },
-  { pattern: /^fri(day)?$/i, day: 5 },
-  { pattern: /^sat(ur)?(day)?$/i, day: 6 },
+  { pattern: /^sun(day)?s?$/i, day: 0 },
+  { pattern: /^mon(day)?s?$/i, day: 1 },
+  { pattern: /^tues?(day)?s?$/i, day: 2 },
+  { pattern: /^wed(nes)?(day)?s?$/i, day: 3 },
+  { pattern: /^thur?s?(day)?s?$/i, day: 4 },
+  { pattern: /^fri(day)?s?$/i, day: 5 },
+  { pattern: /^sat(ur)?(day)?s?$/i, day: 6 },
 ];
 
 /**
@@ -152,13 +153,56 @@ export function parseTimeRange(text: string): { startTime: string; endTime: stri
 const LOCATION =
   /\b(?:in|at|room|rm\.?|location)\s*:?\s*([A-Z][A-Za-z.]*(?:\s+[A-Z][A-Za-z.]*)*\s+\d{1,4}[A-Za-z]?)\b|\b(?:room|rm\.?)\s*:?\s*(\d{1,4}[A-Za-z]?)\b/;
 
+/**
+ * A trailing "Moore 110" on a meeting line, where nothing says "in" or
+ * "room". Timetables write the room as the last thing on the line far more
+ * often than they label it, and this only ever runs on a line already
+ * recognised as a class time.
+ */
+const TRAILING_ROOM = /(?:^|[\s,·|]+)([A-Z][A-Za-z.]*(?:\s+[A-Z][A-Za-z.]*)*)\s+(\d{1,4}[A-Za-z]?)\s*$/;
+
+/**
+ * The same room, when the line did not end there.
+ *
+ * Extraction merges a short line into whatever follows it when a syllabus
+ * writes its headings in bold at body size — so "…, Moore 110" is often in
+ * the middle of a paragraph rather than at the end of one. Anchored to the
+ * time range so it only ever reads what sits directly after the hours.
+ */
+const ROOM_AFTER_TIME =
+  /\d\s*(?:[ap]\.?m\.?)?[,\s]+([A-Z][A-Za-z.]*(?:\s+[A-Z][A-Za-z.]*)?)\s+(\d{1,4}[A-Za-z]?)\b/;
+
+/**
+ * Words that follow a class time often enough to be worth naming, and that
+ * are never a building. "Moore 110" is a room; "Week 6" and "Chapter 3"
+ * are what the next line of the syllabus was about.
+ */
+const NOT_A_BUILDING =
+  /^(course|week|chapter|page|pages|unit|section|part|module|lecture|reading|fall|spring|winter|summer|term|semester)$/i;
+
 function parseLocation(text: string) {
-  const match = LOCATION.exec(text);
-  return (match?.[1] ?? match?.[2] ?? "").trim();
+  const labelled = LOCATION.exec(text);
+  if (labelled) return (labelled[1] ?? labelled[2] ?? "").trim();
+
+  const match = TRAILING_ROOM.exec(text) ?? ROOM_AFTER_TIME.exec(text);
+  if (!match) return "";
+
+  const name = match[1].trim();
+  // A weekday is a day, not a building, however the line ends.
+  if (parseWeekdays(name).length > 0) return "";
+  if (NOT_A_BUILDING.test(name.split(/\s+/)[0])) return "";
+  return `${name} ${match[2]}`.trim();
 }
 
+/**
+ * The plurals are not decoration. "Lectures:" and "Classes:" are as common a
+ * label as the singular, and `\blecture\b` does not match "Lectures" — the
+ * boundary it wants is not there. A syllabus that labels its line that way
+ * used to lose its class times entirely, and with them the calendar blocks
+ * and the per-class lecture steps.
+ */
 const MEETING_LINE =
-  /\b(meets?|meeting|class|lecture|section|seminar|when)\b.{0,40}?\b(time|day|hour)?/i;
+  /\b(meets?|meeting|class(?:es)?|lectures?|sections?|seminars?|when)\b.{0,40}?\b(time|day|hour)?/i;
 
 const OFFICE_HOURS_LINE = /\boffice\s+hours?\b/i;
 

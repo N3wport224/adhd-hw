@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { LecturePlanner } from "@/components/courses/LecturePlanner";
 import { CourseIcon } from "@/components/courses/CourseIcon";
 import { CourseFormDialog } from "@/components/courses/CourseFormDialog";
 import { QuickAddTask } from "@/components/focus/QuickAddTask";
@@ -148,6 +149,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
         </Card>
       </section>
 
+      <LecturePlanner course={course} onEditCourse={() => setEditing(true)} />
+
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>Syllabus &amp; readings</CardTitle>
@@ -173,6 +176,9 @@ export function CourseDetail({ courseId }: { courseId: string }) {
           <p role="status" className="animate-rise-fade text-sm text-[var(--color-ink-muted)]">
             Added {scanSummary.added}{" "}
             {scanSummary.added === 1 ? "assignment" : "assignments"} to this course
+            {scanSummary.lectures > 0
+              ? `, ${scanSummary.lectures} ${scanSummary.lectures === 1 ? "week" : "weeks"} of lectures`
+              : ""}
             {scanSummary.skipped > 0
               ? `, skipped ${scanSummary.skipped} already imported`
               : ""}

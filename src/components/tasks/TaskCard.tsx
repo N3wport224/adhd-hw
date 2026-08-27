@@ -41,8 +41,11 @@ export function TaskCard({
     updateTask(task.id, { status: done ? "todo" : "done" });
   }
 
+  // A finished card is already muted ink and struck through. Fading the whole
+  // card on top of that pushed that muted text under the contrast floor —
+  // done is not the same as unreadable.
   return (
-    <Card className={cn("space-y-4", done && "opacity-70")}>
+    <Card className="space-y-4">
       <div className="flex items-start gap-4">
         <button
           type="button"

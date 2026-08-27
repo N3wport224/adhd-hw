@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useAppData } from "@/lib/appData";
+import { lectureTaskDrafts, plannedLectureWeeks } from "@/lib/lecturePlan";
 import { formatISODate } from "@/lib/syllabusDates";
 import { describeMeetingPattern } from "@/lib/syllabusCourseInfo";
 import { KIND_LABELS, type Confidence, type SyllabusParseResult } from "@/lib/syllabusParser";
@@ -24,6 +25,7 @@ interface SyllabusReviewModalProps {
     skipped: number;
     weights: number;
     details: boolean;
+    lectures: number;
   }): void;
 }
 
@@ -183,7 +185,7 @@ function ReviewForm({
   onClose,
   onImported,
 }: SyllabusReviewModalProps) {
-  const { importTasks, updateCourse } = useAppData();
+  const { data, importTasks, updateCourse } = useAppData();
 
   const [rows, setRows] = useState<Row[]>(() =>
     result.assignments.map((assignment) => ({
@@ -216,6 +218,25 @@ function ReviewForm({
       result.details.officeHours !== null,
   );
   const [termEnd, setTermEnd] = useState(course.termEnd ?? "");
+  const [addLectures, setAddLectures] = useState(true);
+
+  // The lecture weeks follow the term and meeting days as edited on this
+  // screen, not as they were saved before it opened.
+  const patternToUse = saveDetails ? meetingPattern : (course.meetingPattern ?? null);
+  const lectureDrafts = useMemo(
+    () =>
+      lectureTaskDrafts({
+        ...course,
+        termStart: result.termStart,
+        termEnd: termEnd || null,
+        meetingPattern: patternToUse,
+      }),
+    [course, result.termStart, termEnd, patternToUse],
+  );
+  const alreadyPlanned = plannedLectureWeeks(data.tasks, course.id);
+  const newLectureWeeks = lectureDrafts.filter(
+    (draft) => draft.source?.kind === "lectures" && !alreadyPlanned.has(draft.source.weekStart),
+  ).length;
 
   const selected = rows.filter((row) => row.selected);
   const importable = selected.filter((row) => row.title.trim().length > 0);
@@ -232,8 +253,10 @@ function ReviewForm({
     setRows((current) => current.map((row) => (row.id === id ? { ...row, ...changes } : row)));
 
   function handleImport() {
-    const summary = importTasks(
-      importable.map((row) => ({
+    // One call, not two: the deduplication reads the tasks as they are now,
+    // and a second call in the same tick would still be looking at them.
+    const summary = importTasks([
+      ...importable.map((row) => ({
         courseId: course.id,
         title: row.title.trim(),
         notes: "",
@@ -242,7 +265,8 @@ function ReviewForm({
         subtasks: [],
         source: { kind: "syllabus" as const, documentId: document.id, excerpt: row.excerpt },
       })),
-    );
+      ...(addLectures ? lectureDrafts : []),
+    ]);
 
     updateCourse(course.id, {
       termStart: result.termStart,
@@ -257,12 +281,31 @@ function ReviewForm({
         : {}),
     });
 
+    const lectures = addLectures ? newLectureWeeks : 0;
     onImported({
       ...summary,
+      // The count the student cares about is assignments; lectures are their
+      // own line in the confirmation.
+      added: summary.added - lectures,
+      skipped: summary.skipped - (addLectures ? lectureDrafts.length - lectures : 0),
+      lectures,
       weights: saveWeights ? weights.length : 0,
       details: saveDetails && (instructor.trim() !== "" || meetingPattern !== null),
     });
   }
+
+  const addedLectures = addLectures ? newLectureWeeks : 0;
+  const addButtonLabel = (() => {
+    const parts: string[] = [];
+    if (importable.length > 0) {
+      parts.push(`${importable.length} ${importable.length === 1 ? "assignment" : "assignments"}`);
+    }
+    if (addedLectures > 0) {
+      parts.push(`${addedLectures} ${addedLectures === 1 ? "week" : "weeks"} of lectures`);
+    }
+    if (parts.length === 0) return "Save grading breakdown";
+    return `Add ${parts.join(" and ")}`;
+  })();
 
   const orderedRows = useMemo(
     () => [...rows].sort((a, b) => (a.dueAt || "9999").localeCompare(b.dueAt || "9999")),
@@ -597,15 +640,50 @@ function ReviewForm({
         </section>
       ) : null}
 
+      <section className="space-y-3">
+        <h3 className="text-base font-semibold">Lectures</h3>
+        <label className="flex items-start gap-3 rounded-xl bg-[var(--color-surface-muted)] p-4 text-sm">
+          <input
+            type="checkbox"
+            checked={addLectures}
+            onChange={() => setAddLectures((current) => !current)}
+            className="mt-0.5 size-4 accent-[var(--color-accent)]"
+          />
+          <span>
+            <span className="font-medium">
+              Add a lectures task for each week of term
+            </span>
+            <span className="mt-1 block text-[var(--color-ink-muted)]">
+              {newLectureWeeks === 0 ? (
+                alreadyPlanned.size > 0 ? (
+                  "Every week of this term already has one."
+                ) : (
+                  "Set a term start above and the weeks will appear here."
+                )
+              ) : (
+                <>
+                  {newLectureWeeks} {newLectureWeeks === 1 ? "week" : "weeks"}
+                  {patternToUse && patternToUse.days.length > 0
+                    ? `, one step per class — ${describeMeetingPattern(patternToUse)}`
+                    : ", one step a week, since no class days were found"}
+                  .{" "}
+                  {alreadyPlanned.size > 0
+                    ? `The ${alreadyPlanned.size} already added are left alone.`
+                    : "Each one lands on the day it happens."}
+                </>
+              )}
+            </span>
+          </span>
+        </label>
+      </section>
+
       <div className="sticky bottom-0 -mx-6 -mb-6 flex flex-wrap items-center gap-3 border-t border-[var(--color-border-soft)] bg-[var(--color-surface)] px-6 py-4">
         <Button
           variant="primary"
           onClick={handleImport}
-          disabled={importable.length === 0 && !saveWeights}
+          disabled={importable.length === 0 && !saveWeights && addedLectures === 0}
         >
-          {importable.length > 0
-            ? `Add ${importable.length} ${importable.length === 1 ? "assignment" : "assignments"}`
-            : "Save grading breakdown"}
+          {addButtonLabel}
         </Button>
         <Button variant="ghost" onClick={onClose}>
           Not now

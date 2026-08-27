@@ -170,7 +170,23 @@ test("repoints a syllabus source at the document this import created", () => {
     tasks: [{ ...imported, source: { kind: "syllabus", documentId: "d1", excerpt: "Midterm Oct 7" } }],
   };
   const { data } = mergeBackup(EMPTY, incoming, nextId);
-  assert.equal(data.tasks[0].source?.documentId, data.documents[0].id);
+  const source = data.tasks[0].source;
+  assert.equal(source?.kind === "syllabus" && source.documentId, data.documents[0].id);
+});
+
+test("carries a lecture source through untouched", () => {
+  resetIds();
+  const lecture: Task = {
+    ...task("t1", "Week 1 lectures", "c1"),
+    source: { kind: "lectures", weekStart: "2026-09-06" },
+  };
+  const incoming: AppData = {
+    courses: [course("c1", "Maths")],
+    documents: [],
+    tasks: [lecture],
+  };
+  const { data } = mergeBackup(EMPTY, incoming, nextId);
+  assert.deepEqual(data.tasks[0].source, { kind: "lectures", weekStart: "2026-09-06" });
 });
 
 test("gives subtasks fresh ids too", () => {

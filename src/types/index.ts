@@ -102,16 +102,25 @@ export interface SubTask {
 export type TaskStatus = "todo" | "in_progress" | "done";
 
 /**
- * Where a task came from. Imported tasks record the document they were read
- * out of, so a second scan of the same syllabus can recognise what it already
- * created instead of duplicating it.
+ * Where a task came from.
+ *
+ * Tasks read out of a syllabus record the document they came from, so a
+ * second scan of the same file recognises what it already created instead of
+ * duplicating it. Weekly lecture tasks record the week instead, which does
+ * the same job when a term is topped up after its dates change.
  */
-export interface TaskSource {
-  kind: "syllabus";
-  documentId: string;
-  /** The syllabus line the task was read from, for "where did this come from?". */
-  excerpt: string;
-}
+export type TaskSource =
+  | {
+      kind: "syllabus";
+      documentId: string;
+      /** The syllabus line the task was read from, for "where did this come from?". */
+      excerpt: string;
+    }
+  | {
+      kind: "lectures";
+      /** Sunday of the week this covers, as a local day key. */
+      weekStart: ISODateString;
+    };
 
 export interface Task {
   id: string;

@@ -164,9 +164,12 @@ export function mergeBackup(
       id: createId(),
       courseId,
       subtasks: task.subtasks.map((step) => ({ ...step, id: createId() })),
-      source: task.source
-        ? { ...task.source, documentId: documentIdMap.get(task.source.documentId) ?? "" }
-        : undefined,
+      // Only a syllabus source points at a document, and that document has
+      // just been given a new id by this same import.
+      source:
+        task.source?.kind === "syllabus"
+          ? { ...task.source, documentId: documentIdMap.get(task.source.documentId) ?? "" }
+          : task.source,
     });
     added.tasks += 1;
   }

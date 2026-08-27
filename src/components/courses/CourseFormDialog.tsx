@@ -22,6 +22,8 @@ const BLANK_DRAFT: CourseDraft = {
   meetingInfo: "",
   color: "sage",
   icon: "book",
+  termStart: null,
+  termEnd: null,
 };
 
 interface CourseFormDialogProps {
@@ -95,6 +97,8 @@ function CourseForm({
           meetingInfo: course.meetingInfo,
           color: course.color,
           icon: course.icon,
+          termStart: course.termStart ?? null,
+          termEnd: course.termEnd ?? null,
         }
       : BLANK_DRAFT,
   );
@@ -107,6 +111,8 @@ function CourseForm({
     if (!canSave) return;
     onSubmit({
       ...draft,
+      termStart: draft.termStart || null,
+      termEnd: draft.termEnd || null,
       name: draft.name.trim(),
       code: draft.code.trim(),
       instructor: draft.instructor.trim(),
@@ -174,6 +180,38 @@ function CourseForm({
           />
         )}
       </Field>
+
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Term dates</legend>
+        <p className="text-sm text-[var(--color-ink-muted)]">
+          What “Week 4” on a syllabus means, and how far the weekly lectures and
+          class times run.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field label="First day">
+            {({ id, className }) => (
+              <input
+                id={id}
+                type="date"
+                className={className}
+                value={draft.termStart ?? ""}
+                onChange={(event) => setDraft({ ...draft, termStart: event.target.value })}
+              />
+            )}
+          </Field>
+          <Field label="Last day">
+            {({ id, className }) => (
+              <input
+                id={id}
+                type="date"
+                className={className}
+                value={draft.termEnd ?? ""}
+                onChange={(event) => setDraft({ ...draft, termEnd: event.target.value })}
+              />
+            )}
+          </Field>
+        </div>
+      </fieldset>
 
       <div className="space-y-3">
         {/* The group carries its own name, so the heading beside it is

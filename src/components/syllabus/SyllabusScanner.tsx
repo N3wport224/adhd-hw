@@ -13,6 +13,8 @@ export interface ScanSummary {
   weights: number;
   /** True when instructor or meeting times were written to the course. */
   details: boolean;
+  /** Weeks of lecture tasks added, 0 if the student declined. */
+  lectures: number;
 }
 
 interface SyllabusScannerProps {

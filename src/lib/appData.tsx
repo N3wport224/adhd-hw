@@ -14,6 +14,7 @@ import { EMPTY_DATA, localDataStore } from "@/lib/storage";
 import { useLatestRef } from "@/lib/useLatestRef";
 import { createId } from "@/lib/utils";
 import type {
+  TaskSource,
   AppData,
   Course,
   CourseDraft,
@@ -154,21 +155,26 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       // an updater late or twice, and the counts reported back to the student
       // ("added 8, skipped 3") have to be the real ones.
       //
-      // Re-scanning a syllabus should be safe. Two tasks are the same import
-      // if they came from the same document and share a title and due date.
-      // Anything the student has since edited no longer matches, and so is
-      // left alone — an edited task is exactly the one that must not be
-      // silently replaced.
+      // Re-scanning a syllabus, or topping up a term of lectures, should be
+      // safe. A syllabus task is the same import if it came from the same
+      // document and shares a title and due date; a weekly lecture task if it
+      // covers the same week of the same course. Anything the student has
+      // since edited no longer matches, and so is left alone — an edited task
+      // is exactly the one that must not be silently replaced.
       const importKey = (
-        documentId: string | undefined,
-        title: string,
-        dueAt: string | null,
-      ) => `${documentId}|${title.trim().toLowerCase()}|${dueAt ?? ""}`;
+        source: TaskSource | undefined,
+        task: { courseId: string | null; title: string; dueAt: string | null },
+      ) =>
+        source?.kind === "lectures"
+          ? `lectures|${task.courseId}|${source.weekStart}`
+          : `syllabus|${source?.kind === "syllabus" ? source.documentId : ""}|${task.title
+              .trim()
+              .toLowerCase()}|${task.dueAt ?? ""}`;
 
       const existing = new Set(
         dataRef.current.tasks
-          .filter((task) => task.source?.kind === "syllabus")
-          .map((task) => importKey(task.source?.documentId, task.title, task.dueAt)),
+          .filter((task) => task.source !== undefined)
+          .map((task) => importKey(task.source, task)),
       );
 
       const now = new Date().toISOString();
@@ -176,7 +182,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       let skipped = 0;
 
       for (const draft of drafts) {
-        const key = importKey(draft.source?.documentId, draft.title, draft.dueAt);
+        const key = importKey(draft.source, draft);
         if (existing.has(key)) {
           skipped += 1;
           continue;
