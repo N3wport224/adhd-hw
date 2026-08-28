@@ -22,6 +22,8 @@ export interface ReaderSection {
   level: number;
   /** The sentence the section begins at, so jumping to it starts playback there. */
   sentenceIndex: number;
+  /** The heading's own block, which is unique where a sentence index may not be. */
+  blockIndex: number;
 }
 
 /**
@@ -75,7 +77,7 @@ function DocumentOutline({
       {open ? (
         <ul className="space-y-0.5 border-t border-[var(--color-border-soft)] p-2">
           {sections.map((section) => (
-            <li key={section.sentenceIndex}>
+            <li key={section.blockIndex}>
               <button
                 type="button"
                 onClick={() => reader.jumpTo(section.sentenceIndex)}
@@ -147,7 +149,14 @@ function DocumentReader({ document }: { document: StudyDocument }) {
     [blocks],
   );
 
-  /** Where each heading starts, for the outline and the section controls. */
+  /**
+   * Where each heading starts, for the outline and the section controls.
+   *
+   * A heading no sentence was derived from is dropped rather than defaulted
+   * to zero: sending every unplaceable heading to sentence 0 makes them
+   * duplicates of each other in the list, and clicking one jumps silently to
+   * the top of the document instead of to the section it names.
+   */
   const sections = useMemo(
     () =>
       blocks
@@ -156,8 +165,11 @@ function DocumentReader({ document }: { document: StudyDocument }) {
         .map((entry) => ({
           title: entry.block.text,
           level: entry.block.level ?? 3,
-          sentenceIndex: sentences.find((s) => s.paragraphIndex === entry.index)?.index ?? 0,
-        })),
+          blockIndex: entry.index,
+          sentenceIndex: sentences.find((s) => s.paragraphIndex === entry.index)?.index,
+        }))
+        .filter((section) => section.sentenceIndex !== undefined)
+        .map((section) => ({ ...section, sentenceIndex: section.sentenceIndex as number })),
     [blocks, sentences],
   );
 
