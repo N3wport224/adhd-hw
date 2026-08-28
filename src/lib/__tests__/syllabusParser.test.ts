@@ -205,3 +205,183 @@ test("truncates a runaway title instead of storing a paragraph", () => {
   assert.ok(assignment.title.length <= 81, `title was ${assignment.title.length} chars`);
   assert.ok(assignment.title.endsWith("…"));
 });
+
+/**
+ * The shapes below come from two real course syllabi that this parser used to
+ * read almost nothing out of: one PDF laid out as a week-per-row table, one
+ * Word file laid out as a lesson-per-row table. Between them they cover what
+ * a schedule table does to flattened text.
+ */
+
+test("reads the weekly work out of a schedule table", () => {
+  const result = parseSyllabus(
+    [
+      "Course Schedule",
+      "DATE/WEEK TOPIC/SUB-TOPIC READINGS ASSIGNMENT/ ASSESSMENT(S)",
+      "August 24 –",
+      "August 30",
+      "Project Management",
+      "Introduction",
+      "PM Chapter 1 • Discussion Board 1",
+      "Project Assignment 1",
+      "Quiz 1",
+      "October 19 –",
+      "October 25",
+      "Midterm Exam",
+    ],
+    { termStart: "2026-08-24" },
+  );
+
+  const titles = result.assignments.map((assignment) => assignment.title);
+  assert.deepEqual(titles, [
+    "Discussion Board 1",
+    "Project Assignment 1",
+    "Quiz 1",
+    "Midterm Exam",
+  ]);
+  // A week's work is due by the end of the week, not on its Monday.
+  assert.equal(result.assignments[0].dueAt, "2026-08-30");
+  assert.equal(result.assignments.at(-1)?.dueAt, "2026-10-25");
+});
+
+test("does not mistake the topic column for work", () => {
+  const result = parseSyllabus(
+    [
+      "Course Schedule",
+      "September 28 –",
+      "October 4",
+      "Project Team",
+      "Building, Conflict, and",
+      "Negotiation",
+      "PM Chapter 6",
+      "Quiz 6",
+    ],
+    { termStart: "2026-08-24" },
+  );
+  assert.deepEqual(
+    result.assignments.map((assignment) => assignment.title),
+    ["Quiz 6"],
+  );
+});
+
+test("reads a labelled cell, and the week that says there is nothing", () => {
+  const result = parseSyllabus(
+    [
+      "Course Schedule:",
+      "Lesson 1",
+      "Aug 24",
+      "Read prior to class: Text Chapter 1 Systems Engineering",
+      "Assignments: Submit assigned homework problems for Lesson 1 by 5:00 PM Mountain Time",
+      "Discussion: Participate in this Module's Discussion on CANVAS.",
+      "Lesson 14",
+      "Dec 7",
+      "Assignments: No homework assignment for this week.",
+    ],
+    { termStart: "2026-08-24" },
+  );
+
+  const titles = result.assignments.map((assignment) => assignment.title);
+  // The container label is not part of the name, the reading is not work,
+  // and a week with nothing due contributes nothing.
+  assert.deepEqual(titles, [
+    "Submit assigned homework problems for Lesson 1",
+    "Discussion: Participate in this Module's Discussion on CANVAS.",
+  ]);
+});
+
+test("does not read the letter-grade scale as a breakdown", () => {
+  const result = parseSyllabus(
+    [
+      "Grading Policy",
+      "Grade Range",
+      "A+ 100% to 96.67%",
+      "A <96.67% to 93.33%",
+      "B+ <90.0% to 86.67%",
+      "F <60.0% to 0.0%",
+      "Discussion Boards (14) 14 14%",
+      "Midterm Exam 25 25%",
+    ],
+    { termStart: "2026-08-24" },
+  );
+
+  assert.deepEqual(result.gradingWeights, [
+    { label: "Discussion Boards", percent: 14 },
+    { label: "Midterm Exam", percent: 25 },
+  ]);
+});
+
+test("keeps two numbered projects apart in the breakdown", () => {
+  const result = parseSyllabus(
+    [
+      "Grading",
+      "Item",
+      "Points",
+      "Weightage",
+      "Homework",
+      "75",
+      "15%",
+      "Discussion Forum",
+      "50",
+      "10%",
+      "Project 1",
+      "150",
+      "30%",
+      "1st Peer Review",
+      "0",
+      "Pass/Fail",
+      "Project 2",
+      "150",
+      "30%",
+      "Quizzes",
+      "75",
+      "15%",
+      "Total:",
+      "500",
+      "100%",
+    ],
+    { termStart: "2026-08-24" },
+  );
+
+  // "Project 1 150 30%" read column-wise, not as "Project" worth 30% twice —
+  // and the pass/fail row, which has no percentage, breaks nothing.
+  assert.deepEqual(result.gradingWeights, [
+    { label: "Homework", percent: 15 },
+    { label: "Discussion Forum", percent: 10 },
+    { label: "Project 1", percent: 30 },
+    { label: "Project 2", percent: 30 },
+    { label: "Quizzes", percent: 15 },
+  ]);
+  // The total is the row above, not a component, so it is left out — and the
+  // parts add to 100 without it.
+  assert.deepEqual(result.warnings, []);
+});
+
+test("does not file the heading under the table as work", () => {
+  // "Assignment Overviews" is the section explaining the assignments, and it
+  // sits immediately under the last row of the schedule.
+  const result = parseSyllabus(
+    [
+      "Course Schedule",
+      "December 14 –",
+      "December 17",
+      "Final Exam",
+      "Assignment Overviews",
+    ],
+    { termStart: "2026-08-24" },
+  );
+  assert.deepEqual(
+    result.assignments.map((assignment) => assignment.title),
+    ["Final Exam"],
+  );
+});
+
+test("does not file a class activity as something to hand in", () => {
+  const result = parseSyllabus(
+    ["Course Schedule:", "Lesson 5", "Sep 28", "Project 1 Build Session: Needs Analysis", "Quiz 2"],
+    { termStart: "2026-08-24" },
+  );
+  assert.deepEqual(
+    result.assignments.map((assignment) => assignment.title),
+    ["Quiz 2"],
+  );
+});

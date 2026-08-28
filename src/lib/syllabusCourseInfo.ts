@@ -53,6 +53,13 @@ function fromCompressed(token: string): Weekday[] | null {
 }
 
 /**
+ * Time zones, which are letters a timetable code could otherwise be made of.
+ * "Meeting Times: Tuesdays 5:15 – 8:00 PM MT" reads MT as Monday and Tuesday
+ * and puts a class on the calendar that does not exist.
+ */
+const TIMEZONE = /^(?:UTC|GMT|[MCEP][SD]?T)$/i;
+
+/**
  * The weekdays named in a fragment. Handles spelled-out lists
  * ("Tuesday and Thursday"), separated abbreviations ("Tue/Thu") and
  * compressed timetable codes ("MWF", "TuTh").
@@ -63,6 +70,8 @@ export function parseWeekdays(text: string): Weekday[] {
   for (const token of text.split(/[\s,/&+]+|\band\b/i)) {
     const word = token.replace(/[.:;]+$/, "").trim();
     if (!word) continue;
+
+    if (TIMEZONE.test(word)) continue;
 
     const named = DAY_WORDS.find((entry) => entry.pattern.test(word));
     if (named) {
@@ -204,6 +213,9 @@ function parseLocation(text: string) {
 const MEETING_LINE =
   /\b(meets?|meeting|class(?:es)?|lectures?|sections?|seminars?|when)\b.{0,40}?\b(time|day|hour)?/i;
 
+/** Past this a line is a sentence about the class, not a statement of when it meets. */
+const MEETING_LINE_LENGTH = 120;
+
 const OFFICE_HOURS_LINE = /\boffice\s+hours?\b/i;
 
 const INSTRUCTOR_LINE =
@@ -219,14 +231,31 @@ const INSTRUCTOR_LINE =
 const NAME_PATTERN =
   /^((?:[Dd]r|[Pp]rof(?:essor)?|[Mm]r|[Mm]rs|[Mm]s|[Mm]x)\.?\s+)?[A-Z][A-Za-z'’-]+(?:\s+[A-Z][A-Za-z'’.-]+){0,3}/;
 
+/**
+ * Words that follow "Instructor" on a heading rather than naming anybody.
+ * "Instructor Information" is a section title, and reading it as a name put
+ * "Information" on the course page of every syllabus that has one.
+ */
+const NOT_A_NAME = /^(information|info|details|contact|name|team|staff)$/i;
+
+/** The label that so often sits between "Instructor" and the actual name. */
+const NAME_LABEL = /^(?:name|information|info|details|contact)\b\s*:?\s*/i;
+
 function parseInstructor(text: string) {
   const match = INSTRUCTOR_LINE.exec(text);
   if (!match) return null;
   // The sentence boundary is already handled by the shared splitter, and the
   // name pattern stops on its own at a comma or a lower-case word — so there
   // is nothing left to trim off the end here.
-  const name = NAME_PATTERN.exec(match[2].trim())?.[0]?.trim().replace(/[.,;]+$/, "");
-  return name && name.length > 2 ? name : null;
+  const rest = match[2].trim().replace(NAME_LABEL, "").trim();
+  const name = NAME_PATTERN.exec(rest)?.[0]?.trim().replace(/[.,;]+$/, "");
+  return name && name.length > 2 && !NOT_A_NAME.test(name) ? name : null;
+}
+
+/** A bare name on a line of its own, as the line under an "Instructor" heading. */
+function bareName(text: string) {
+  const name = NAME_PATTERN.exec(text.trim())?.[0]?.trim().replace(/[.,;]+$/, "");
+  return name && name.length > 2 && name === text.trim().replace(/[.,;]+$/, "") ? name : null;
 }
 
 /**
@@ -240,6 +269,9 @@ export function parseCourseDetails(paragraphs: string[]): CourseDetails {
   let instructor: string | null = null;
   let officeHours: string | null = null;
   let meetingPattern: MeetingPattern | null = null;
+  // Set when a line said "Instructor" but named nobody, so the name on the
+  // line below it — the common layout — is still found.
+  let expectingName = false;
 
   for (const paragraph of paragraphs) {
     // A paragraph often carries several labelled facts on one line, so each
@@ -253,12 +285,23 @@ export function parseCourseDetails(paragraphs: string[]): CourseDetails {
       const text = fragment.trim();
       if (!text) continue;
 
-      if (!instructor) instructor = parseInstructor(text);
+      if (!instructor) {
+        instructor = parseInstructor(text);
+        if (instructor) expectingName = false;
+        else if (INSTRUCTOR_LINE.test(text)) expectingName = true;
+        else if (expectingName) {
+          instructor = bareName(text);
+          if (instructor) expectingName = false;
+        }
+      }
 
       if (OFFICE_HOURS_LINE.test(text)) {
         if (!officeHours) {
           officeHours = text
             .replace(/^.*?\boffice\s+hours?\b\s*(are|:|is)?\s*/i, "")
+            // A syllabus that writes "Office Hours/Student Hours:" leaves the
+            // slash behind when the label is cut off.
+            .replace(/^[^A-Za-z0-9]+/, "")
             .replace(/[.\s]+$/, "")
             .trim() || null;
         }
@@ -268,6 +311,10 @@ export function parseCourseDetails(paragraphs: string[]): CourseDetails {
       }
 
       if (meetingPattern) continue;
+      // A timetable states itself in a few words. A paragraph this long is
+      // prose that happens to contain "class", and reading a stray letter in
+      // it as a weekday put a phantom lecture on every calendar.
+      if (text.length > MEETING_LINE_LENGTH) continue;
       if (!MEETING_LINE.test(text)) continue;
 
       const days = parseWeekdays(text);

@@ -132,7 +132,15 @@ export function htmlBlocks(html: string): DocumentBlock[] {
   let match: RegExpExecArray | null;
   while ((match = BLOCK_MATCH.exec(html)) !== null) {
     const tag = match[1].toLowerCase();
-    const text = decodeEntities(match[2].replace(INLINE_TAGS, "")).replace(/\s+/g, " ").trim();
+    // Anything still carrying angle brackets is markup, not words. Word
+    // tables nest a list inside a paragraph that is never closed before it,
+    // so the lazy capture above swallows the <ul><li> — which then reached
+    // the page, and the voice, as literal text.
+    const text = decodeEntities(
+      match[2].replace(INLINE_TAGS, "").replace(/<[^>]+>/g, " "),
+    )
+      .replace(/\s+/g, " ")
+      .trim();
     if (!text) continue;
 
     if (tag === "li") {

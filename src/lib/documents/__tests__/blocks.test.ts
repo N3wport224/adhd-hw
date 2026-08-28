@@ -198,3 +198,14 @@ test("does not read a year or a large quantity as a list marker", () => {
   ]);
   assert.deepEqual(blocks.slice(1).map((b) => b.kind), ["paragraph", "paragraph"]);
 });
+
+test("strips markup a Word table leaves inside a paragraph", () => {
+  // Word nests a list inside a table cell's paragraph without closing it, so
+  // the tags used to arrive as text — and be read aloud as "ul li".
+  const blocks = htmlBlocks("<p>Assignments:<ul><li>Submit the problem set</li></ul></p>");
+  assert.ok(
+    blocks.every((block) => !/[<>]/.test(block.text)),
+    `markup survived: ${JSON.stringify(blocks)}`,
+  );
+  assert.match(blocks[0].text, /Assignments: Submit the problem set/);
+});

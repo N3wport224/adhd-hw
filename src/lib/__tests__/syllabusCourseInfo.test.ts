@@ -191,3 +191,37 @@ test("writes a shared meridiem once", () => {
 test("a range with no end is just the start", () => {
   assert.equal(formatTimeRange("09:30", null), formatClockTime("09:30"));
 });
+
+test("does not read a time zone as a pair of weekdays", () => {
+  // "MT" is Mountain Time. Read as a timetable code it is Monday and
+  // Tuesday, and it put a class on the calendar that never meets.
+  const pattern = parseCourseDetails([
+    "Meeting Times: Tuesdays 5:15 – 8:00 PM MT",
+  ]).meetingPattern;
+  assert.deepEqual(pattern?.days, [2]);
+  assert.equal(pattern?.startTime, "17:15");
+  assert.equal(pattern?.endTime, "20:00");
+});
+
+test("does not read a paragraph about the class as a timetable", () => {
+  const details = parseCourseDetails([
+    "Grading Scale: Students are evaluated and assessed using homework assignments, projects, written and oral reports, and presentations. This class uses a standard scale, and every component is described in the table below.",
+  ]);
+  assert.equal(details.meetingPattern, null);
+});
+
+test("takes the name from under an Instructor heading", () => {
+  // Two real layouts: a bare name on the next line, and a labelled one.
+  assert.equal(
+    parseCourseDetails(["Instructor Information", "Dr. Gregory Marzolf"]).instructor,
+    "Dr. Gregory Marzolf",
+  );
+  assert.equal(
+    parseCourseDetails(["Instructor Information", "Instructor Name: Michael Botyarov"]).instructor,
+    "Michael Botyarov",
+  );
+});
+
+test("never reports the heading itself as the instructor", () => {
+  assert.equal(parseCourseDetails(["Instructor Information"]).instructor, null);
+});
