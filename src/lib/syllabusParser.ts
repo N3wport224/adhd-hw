@@ -378,6 +378,32 @@ export function summariseAssignments(titles: string[]): AssignmentGroup[] {
   return [...groups.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
+/** How far apart two readings of the same thing can be and still be the same. */
+const ECHO_DAYS = 10;
+
+/**
+ * Drops a guess the table already answered better.
+ *
+ * "There will be a midterm exam during week 9" is a sentence about the
+ * midterm, not a second midterm — and it arrived as a low-confidence row
+ * sitting directly above the real one. On the one screen whose job is to be
+ * trusted, a duplicate that is almost right is worse than nothing.
+ */
+function suppressEchoes(assignments: ParsedAssignment[]): ParsedAssignment[] {
+  const confident = assignments.filter((item) => item.confidence !== "low" && item.dueAt);
+
+  return assignments.filter((item) => {
+    if (item.confidence !== "low" || !item.dueAt) return true;
+    const day = new Date(`${item.dueAt}T00:00:00`).getTime();
+    return !confident.some(
+      (other) =>
+        other.kind === item.kind &&
+        Math.abs(new Date(`${other.dueAt}T00:00:00`).getTime() - day) <=
+          ECHO_DAYS * 86_400_000,
+    );
+  });
+}
+
 function extractAssignments(paragraphs: string[], term: TermWindow): ParsedAssignment[] {
   const assignments: ParsedAssignment[] = [];
   const seen = new Set<string>();
@@ -441,7 +467,7 @@ function extractAssignments(paragraphs: string[], term: TermWindow): ParsedAssig
     assignments.push({ ...row, id: `assignment-${assignments.length}` });
   }
 
-  return assignments.sort((a, b) => {
+  return suppressEchoes(assignments).sort((a, b) => {
     if (a.dueAt && b.dueAt) return a.dueAt.localeCompare(b.dueAt);
     if (a.dueAt) return -1;
     if (b.dueAt) return 1;

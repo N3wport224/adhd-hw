@@ -1,16 +1,29 @@
 "use client";
 
-import { PHASE_LABELS, PHASE_SECONDS, usePomodoro } from "@/lib/pomodoro";
+import { useEffect, useRef, useState } from "react";
+import {
+  DEFAULT_FOCUS_MINUTES,
+  FOCUS_MINUTES,
+  PHASE_LABELS,
+  phaseSeconds,
+  usePomodoro,
+  type FocusMinutes,
+} from "@/lib/pomodoro";
 import { cn, formatClock } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 
 interface PomodoroTimerProps {
   /** Name of what the timer is for, so the block has a subject. */
   taskTitle?: string;
-  /** Called when a focus block completes, to count it against the task. */
-  onFocusComplete?(): void;
+  /** Called when a focus block completes, with the minutes it ran for. */
+  onFocusComplete?(minutes: number): void;
   /** Focus blocks already recorded against this task, across sittings. */
   completedTotal?: number;
+  /** Block length to open on, for an on-ramp that asks for very little. */
+  initialMinutes?: FocusMinutes;
+  /** Start counting immediately, so nothing stands between deciding and doing. */
+  autoStart?: boolean;
 }
 
 const RADIUS = 52;
@@ -20,9 +33,20 @@ export function PomodoroTimer({
   taskTitle,
   onFocusComplete,
   completedTotal,
+  initialMinutes = DEFAULT_FOCUS_MINUTES,
+  autoStart = false,
 }: PomodoroTimerProps) {
-  const pomodoro = usePomodoro({ onFocusComplete });
+  const [minutes, setMinutes] = useState<FocusMinutes>(initialMinutes);
+  const pomodoro = usePomodoro({ onFocusComplete, focusMinutes: minutes });
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (!autoStart || started.current) return;
+    started.current = true;
+    pomodoro.start();
+  }, [autoStart, pomodoro]);
   const focusing = pomodoro.phase === "focus";
+  const atStart = pomodoro.secondsLeft === phaseSeconds(pomodoro.phase, minutes);
 
   return (
     <div className="flex flex-col items-center gap-5">
@@ -74,12 +98,57 @@ export function PomodoroTimer({
         </p>
       ) : null}
 
+      {pomodoro.asking ? (
+        <div
+          role="status"
+          className="animate-rise-fade flex flex-col items-center gap-3 rounded-[var(--radius-card)] bg-[var(--color-accent-wash)] px-5 py-4"
+        >
+          <p className="text-sm font-medium">
+            That is {minutes} minutes done. Keep going, or take a break?
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button variant="primary" onClick={pomodoro.keepGoing}>
+              Keep going
+            </Button>
+            <Button variant="secondary" onClick={pomodoro.takeBreak}>
+              Take the break
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {focusing && !pomodoro.running && atStart ? (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span aria-hidden="true" className="text-sm text-[var(--color-ink-muted)]">
+            Block
+          </span>
+          <ChoiceGroup
+            label="How long a focus block runs"
+            choices={FOCUS_MINUTES.map((option) => ({
+              value: String(option),
+              label: `${option}m`,
+            }))}
+            value={String(minutes)}
+            onSelect={(next) => setMinutes(Number(next) as FocusMinutes)}
+            className="flex flex-wrap gap-1"
+            optionClassName={(selected) =>
+              cn(
+                "min-h-9 rounded-lg px-3 text-sm font-medium transition",
+                selected
+                  ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                  : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]",
+              )
+            }
+          />
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-center gap-2">
         <Button
           variant="primary"
           onClick={pomodoro.running ? pomodoro.pause : pomodoro.start}
         >
-          {pomodoro.running ? "Pause" : pomodoro.secondsLeft === PHASE_SECONDS[pomodoro.phase] ? "Start" : "Resume"}
+          {pomodoro.running ? "Pause" : atStart ? "Start" : "Resume"}
         </Button>
         <Button variant="ghost" onClick={pomodoro.reset}>
           Reset

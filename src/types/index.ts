@@ -88,6 +88,8 @@ export interface SubTask {
   done: boolean;
   /** Rough size, used to suggest how many pomodoros a step needs. */
   estimatedMinutes: number | null;
+  /** When it was ticked off, so a week can be summed up honestly. */
+  doneAt?: ISODateString | null;
   /**
    * The day this step is meant to be done, as a local calendar day
    * (YYYY-MM-DD).
@@ -137,6 +139,15 @@ export interface Task {
   subtasks: SubTask[];
   /** Completed pomodoro count, for the visual timer. */
   pomodorosCompleted: number;
+  /**
+   * Minutes actually spent on this in finished focus blocks.
+   *
+   * Counted in minutes rather than blocks because a block is no longer a
+   * fixed length — and because minutes are what an estimate is made of.
+   */
+  focusMinutes?: number;
+  /** When the task was finished, for the same reason steps carry one. */
+  doneAt?: ISODateString | null;
   /** Absent for tasks the student typed in themselves. */
   source?: TaskSource;
   createdAt: ISODateString;

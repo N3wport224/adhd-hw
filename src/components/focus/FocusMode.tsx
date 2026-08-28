@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppData } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
+import { useFocusTrap } from "@/lib/useFocusTrap";
+import { useLatestRef } from "@/lib/useLatestRef";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { PomodoroTimer } from "@/components/focus/PomodoroTimer";
+import type { FocusMinutes } from "@/lib/pomodoro";
 import type { Task } from "@/types";
 
 interface FocusModeProps {
   task: Task;
   onExit(): void;
+  /** Opening block length, and whether to start it without being asked again. */
+  startMinutes?: FocusMinutes;
+  autoStart?: boolean;
 }
 
 /**
@@ -21,27 +27,56 @@ interface FocusModeProps {
  * Everything still visible at the edges is something to look at instead of
  * the work, which is the exact failure this view exists to prevent.
  */
-export function FocusMode({ task, onExit }: FocusModeProps) {
-  const { data, updateTask, toggleSubtask } = useAppData();
+export function FocusMode({ task, onExit, startMinutes, autoStart }: FocusModeProps) {
+  const { data, addTask, updateTask, toggleSubtask } = useAppData();
   const course = data.courses.find((item) => item.id === task.courseId) ?? null;
   const nextStep = task.subtasks.find((step) => !step.done) ?? null;
   const doneSteps = task.subtasks.filter((step) => step.done).length;
 
+  // An intrusive thought mid-session — "email the TA" — costs the session if
+  // acting on it means leaving this screen. One key puts it somewhere safe
+  // without the timer or the page moving.
+  const [capturing, setCapturing] = useState(false);
+  const [caught, setCaught] = useState<string | null>(null);
+  const captureField = useRef<HTMLInputElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  // Read by the Escape handler, which must not become a dependency of the
+  // trap — re-registering it on every keystroke would be silly.
+  const capturingRef = useLatestRef(capturing);
+
+  // Escape backs out of the capture field first and only then out of the
+  // session — leaving a whole sitting because you changed your mind about a
+  // note would be a rotten trade.
+  const escape = useCallback(() => {
+    if (capturingRef.current) {
+      setCapturing(false);
+      return;
+    }
+    onExit();
+  }, [onExit, capturingRef]);
+
+  // The same trap the dialogs use: Tab stays inside, and focus goes back to
+  // whatever opened the session rather than being dropped on the page.
+  useFocusTrap(true, panel, escape);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onExit();
+      // Not while something is already being typed into.
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (event.key === "c" && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        setCapturing(true);
+        window.setTimeout(() => captureField.current?.focus(), 0);
+      }
     }
     document.addEventListener("keydown", onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [onExit]);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
     <div
+      ref={panel}
       role="dialog"
       aria-modal="true"
       aria-label={`Focus mode: ${task.title}`}
@@ -82,10 +117,75 @@ export function FocusMode({ task, onExit }: FocusModeProps) {
         <PomodoroTimer
           taskTitle={nextStep ? undefined : task.title}
           completedTotal={task.pomodorosCompleted}
-          onFocusComplete={() =>
-            updateTask(task.id, { pomodorosCompleted: task.pomodorosCompleted + 1 })
+          initialMinutes={startMinutes}
+          autoStart={autoStart}
+          onFocusComplete={(minutes) =>
+            updateTask(task.id, {
+              pomodorosCompleted: task.pomodorosCompleted + 1,
+              // Minutes, not blocks: a block is no longer a fixed length, and
+              // minutes are what a later estimate is made of.
+              focusMinutes: (task.focusMinutes ?? 0) + minutes,
+            })
           }
         />
+
+        {capturing ? (
+          <form
+            className="flex w-full max-w-md items-center gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const title = captureField.current?.value.trim() ?? "";
+              if (title) {
+                addTask({
+                  courseId: task.courseId,
+                  title,
+                  notes: "",
+                  dueAt: null,
+                  status: "todo",
+                  subtasks: [],
+                });
+                setCaught(title);
+              }
+              setCapturing(false);
+            }}
+          >
+            <label htmlFor="focus-capture" className="sr-only">
+              Something to deal with later
+            </label>
+            <input
+              ref={captureField}
+              id="focus-capture"
+              placeholder="Park it and carry on…"
+              autoComplete="off"
+              // Only when focus actually leaves the form. Blur fires before
+              // click, so closing on any blur meant the button next to it
+              // unmounted before its own submit could run — and the typed
+              // thought was lost by the one gesture meant to save it.
+              onBlur={(event) => {
+                if (!event.currentTarget.form?.contains(event.relatedTarget)) {
+                  setCapturing(false);
+                }
+              }}
+              className="min-h-11 flex-1 rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface)] px-3 text-sm"
+            />
+            <Button type="submit" variant="secondary">
+              Park it
+            </Button>
+          </form>
+        ) : (
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            {caught ? (
+              <span role="status" className="animate-rise-fade">
+                Parked “{caught}” for later. Back to it.
+              </span>
+            ) : (
+              <>
+                Press <kbd className="rounded border border-[var(--color-border-soft)] px-1.5 py-0.5 font-mono text-xs">C</kbd>{" "}
+                to park a stray thought without leaving this.
+              </>
+            )}
+          </p>
+        )}
 
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Button

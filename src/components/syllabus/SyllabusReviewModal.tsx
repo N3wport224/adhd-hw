@@ -11,7 +11,7 @@ import {
   type Confidence,
   type SyllabusParseResult,
 } from "@/lib/syllabusParser";
-import { cn } from "@/lib/utils";
+import { cn, plural } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { controlClass } from "@/components/ui/Field";
@@ -75,6 +75,15 @@ export function SyllabusReviewModal(props: SyllabusReviewModalProps) {
 }
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** How far ahead is worth putting on a list today. */
+const HORIZON_DAYS = 31;
+
+function horizon() {
+  const date = new Date();
+  date.setDate(date.getDate() + HORIZON_DAYS);
+  return date.toISOString().slice(0, 10);
+}
 
 /**
  * Days as toggles and times as fields, rather than a text box to retype.
@@ -198,7 +207,15 @@ function ReviewForm({
       // Unsure rows start unchecked. The point of this screen is that a
       // student can trust what lands in their list, and a wrong due date is
       // worse than a missing one.
-      selected: assignment.confidence !== "low" && assignment.dueAt !== null,
+      //
+      // So does anything past the next month. A term arrives as forty-odd
+      // items, and importing all of them on day one is the wall of everything
+      // this app exists to avoid — the rest is one click away, when it is
+      // closer to being real.
+      selected:
+        assignment.confidence !== "low" &&
+        assignment.dueAt !== null &&
+        assignment.dueAt <= horizon(),
       title: assignment.title,
       dueAt: assignment.dueAt ?? "",
       rawDate: assignment.rawDate,
@@ -314,6 +331,10 @@ function ReviewForm({
 
   // What the checked rows amount to, so the shape of the import can be read
   // without going down forty near-identical lines.
+  const laterCount = rows.filter(
+    (row) => !row.selected && row.dueAt !== "" && row.dueAt > horizon(),
+  ).length;
+
   const shape = useMemo(
     () => summariseAssignments(importable.map((row) => row.title)),
     [importable],
@@ -455,14 +476,25 @@ function ReviewForm({
             </div>
           </div>
 
+          {laterCount > 0 ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              {laterCount} further out than a month {laterCount === 1 ? "is" : "are"} left
+              unticked — <button
+                type="button"
+                onClick={() => setRows((c) => c.map((row) => ({ ...row, selected: true })))}
+                className="underline underline-offset-4 hover:text-[var(--color-ink)]"
+              >
+                take the whole term
+              </button>{" "}
+              if you would rather see it all.
+            </p>
+          ) : null}
+
           {shape.length > 0 ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
               That is{" "}
               {shape
-                .map(
-                  (group) =>
-                    `${group.count} × ${group.label}${group.count > 1 && !/s$/i.test(group.label) ? "s" : ""}`,
-                )
+                .map((group) => `${group.count} × ${plural(group.label, group.count)}`)
                 .join(", ")}
               .
             </p>

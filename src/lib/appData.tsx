@@ -217,11 +217,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     (id: string, patch: Partial<Omit<Task, "id" | "createdAt">>) => {
       setData((prev) => ({
         ...prev,
-        tasks: prev.tasks.map((task) =>
-          task.id === id
-            ? { ...task, ...patch, updatedAt: new Date().toISOString() }
-            : task,
-        ),
+        tasks: prev.tasks.map((task) => {
+          if (task.id !== id) return task;
+          const now = new Date().toISOString();
+          const next = { ...task, ...patch, updatedAt: now };
+          // The same stamp the steps carry, for the same reason.
+          if (patch.status !== undefined && patch.doneAt === undefined) {
+            next.doneAt = patch.status === "done" ? now : null;
+          }
+          return next;
+        }),
       }));
     },
     [],
@@ -267,18 +272,25 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       ...prev,
       tasks: prev.tasks.map((task) => {
         if (task.id !== taskId) return task;
+        const now = new Date().toISOString();
         const subtasks = task.subtasks.map((step) =>
-          step.id === subtaskId ? { ...step, done: !step.done } : step,
+          step.id === subtaskId
+            ? // Stamped when ticked and cleared when un-ticked, so a week can
+              // be summed from a record rather than an impression.
+              { ...step, done: !step.done, doneAt: step.done ? null : now }
+            : step,
         );
         // Finishing the last step completes the task, and un-checking one
         // reopens it. Making someone tick the same box twice is exactly the
         // kind of friction that gets a tool abandoned.
         const allDone = subtasks.length > 0 && subtasks.every((step) => step.done);
+        const status = allDone ? "done" : task.status === "done" ? "in_progress" : task.status;
         return {
           ...task,
           subtasks,
-          status: allDone ? "done" : task.status === "done" ? "in_progress" : task.status,
-          updatedAt: new Date().toISOString(),
+          status,
+          doneAt: status === "done" ? (task.doneAt ?? now) : null,
+          updatedAt: now,
         };
       }),
     }));

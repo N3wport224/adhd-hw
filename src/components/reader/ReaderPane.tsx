@@ -94,15 +94,20 @@ export function ReaderPane({
         // reading like prose. Clicking is a pointer shortcut for jumping; the
         // keyboard equivalent is the skip controls above, which is far better
         // than tabbing through several hundred sentences to reach one.
+        //
+        // Double-click, and no hover tint. A pane whose whole purpose is a
+        // still surface to read should not have every sentence light up as
+        // the cursor crosses it — that is motion, in the one place motion is
+        // least wanted — and a single stray click used to throw the voice
+        // somewhere else mid-paragraph.
         <span
           key={sentence.index}
           ref={active ? activeRef : undefined}
-          onClick={() => onSelectSentence(sentence.index)}
-          title="Read from here"
+          onDoubleClick={() => onSelectSentence(sentence.index)}
+          title="Double-click to read from here"
           aria-current={active ? "true" : undefined}
           className={cn(
-            "cursor-pointer rounded-md transition-colors",
-            "hover:bg-[var(--color-surface-muted)]",
+            "rounded-md transition-colors",
             active
               ? "bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
               : "text-[var(--color-ink)]",

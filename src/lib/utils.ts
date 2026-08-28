@@ -45,3 +45,25 @@ export function formatClock(totalSeconds: number) {
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
+
+/**
+ * A plural that reads like English for the words this app actually counts.
+ *
+ * Not a general pluraliser — a naive "+ s" gave "5 × Quizs" on a real import,
+ * which is the sort of thing that makes a screen look untended.
+ */
+export function plural(word: string, count: number): string {
+  if (count === 1) return word;
+
+  const head = word.slice(0, -1);
+  const last = word.slice(-1).toLowerCase();
+  const lower = word.toLowerCase();
+
+  if (/(s|x|z|ch|sh)$/i.test(word)) {
+    // "Quiz" doubles before the ending; "Boards" is already plural.
+    if (lower.endsWith("s")) return word;
+    return /[aeiou]z$/i.test(word) ? `${word}${last}es` : `${word}es`;
+  }
+  if (/[^aeiou]y$/i.test(word)) return `${head}ies`;
+  return `${word}s`;
+}

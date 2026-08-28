@@ -69,7 +69,7 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 210 cases
+npm test           # node:test over the pure logic — 223 cases
 ```
 
 ## What it does
@@ -95,8 +95,9 @@ adjustable next to the reading and remembered per device, and playback is
 keyboard-driven: space to play or pause, arrows to move a sentence, shift and
 arrows to move a section, escape to stop.
 The sentence being spoken is highlighted, the word within it is underlined
-where the browser reports boundary events, and the page follows along. Click
-any sentence to read from there. Your position is remembered per document.
+where the browser reports boundary events, and the page follows along. Double-click any
+sentence to read from there — deliberately two clicks, and with no hover
+tint, because a pane meant to be read should not flicker under the cursor. Your position is remembered per document.
 
 **Syllabus parsing** — uploading a document that reads like a syllabus opens a
 review step rather than writing anything. It finds assignments (pairing a date
@@ -105,7 +106,11 @@ shows each row with its confidence, the date exactly as the syllabus wrote it,
 and the source line it came from. Every row is editable and deletable; unsure
 rows start unchecked. Confirmed rows become tasks on that course; the grading
 breakdown and course details are saved to the course, and the meeting pattern
-starts appearing on the calendar. Days are toggles and times are fields, so
+starts appearing on the calendar. Anything due more than a month out starts
+unticked — a term arrives as forty-odd items, and importing all of them on day
+one is the wall this app exists to avoid — with one link to take the whole term
+anyway. The step also opens with what the import amounts to ("13 × Quizzes, 14
+× Discussion Boards"), so its shape can be checked without reading every row. Days are toggles and times are fields, so
 correcting a wrong day costs one tap. Re-scanning the same document skips
 what it already imported.
 
@@ -154,8 +159,31 @@ for watching the recordings. Adding again only fills in the weeks that are
 missing, so extending a term tops it up rather than duplicating it.
 
 **Focus mode** — from the Focus dashboard, one task fills the screen with its
-next step and a Pomodoro timer, and nothing else. Completed focus blocks are
-counted against the task.
+next step and a timer, and nothing else. Two ways in: **Just five minutes**,
+which is the on-ramp — the hard part is agreeing to begin, and a small enough
+ask is one nobody argues with — or a full session. Either opens already
+counting, so nothing stands between deciding and having started.
+
+The block is 5 to 50 minutes, not a fixed 25: twenty-five is a convention, not
+a finding, and it is both too much to agree to on a bad day and an
+interruption in the middle of a good one. At the bell the timer **asks** —
+keep going, or take the break — rather than stopping you.
+
+Pressing **C** parks a stray thought without leaving the session. An intrusive
+"I need to email the TA" costs the whole sitting if acting on it means
+navigating away.
+
+Time spent is recorded in minutes, and once the same kind of work has been
+done twice the app can say what it typically takes — an estimate from your own
+history rather than a number you guessed. Time blindness is the deficit; being
+asked to estimate does not fix it.
+
+**Knowing what a week holds** — the Focus page says when the rest of the week
+is more planned work than the evenings left can hold, and sums up what the
+last seven days actually produced. The planner used to spread steps without
+ever saying "this is too much", which quietly confirmed an underestimate; and
+nothing said what a week had produced, which matters because the feeling on a
+Friday evening is "I got nothing done" almost regardless of what happened.
 
 **Settings & backup** (`/settings`) — download everything as a JSON file and
 import it back. The date of the last backup is kept per device, and after a
@@ -220,6 +248,8 @@ adhd-hw/
     │   ├── calendarFeed.ts             # iCalendar parsing for course feeds
     │   ├── syllabusTables.ts           # flattened table rows, put back together
     │   ├── backupReminder.ts           # when this device last backed up
+    │   ├── workHistory.ts              # what this kind of work usually costs
+    │   ├── weekLoad.ts                 # the week ahead, and the week behind
     │   ├── useFocusTrap.ts             # focus handling shared by every overlay
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format

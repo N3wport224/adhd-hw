@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/lib/appData";
+import { describeHours, weekDone, weekLoad } from "@/lib/weekLoad";
+import { DEFAULT_FOCUS_MINUTES, type FocusMinutes } from "@/lib/pomodoro";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { Button, LinkButton } from "@/components/ui/Button";
@@ -180,8 +182,15 @@ function byUrgency(a: Task, b: Task) {
 export function FocusView() {
   const { data, ready, updateTask } = useAppData();
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
+  // How long the session was opened for. Five minutes is the on-ramp: the
+  // hard part is not the work, it is agreeing to begin, and a small enough
+  // ask is one nobody argues with.
+  const [startMinutes, setStartMinutes] = useState<FocusMinutes>(DEFAULT_FOCUS_MINUTES);
   const [caughtUp, setCaughtUp] = useState(false);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
+
+  const load = useMemo(() => weekLoad(data.tasks), [data.tasks]);
+  const done = useMemo(() => weekDone(data.tasks), [data.tasks]);
 
   const { nextUp, dueToday, laterCount, doneToday } = useMemo(() => {
     const open = data.tasks.filter((task) => task.status !== "done").sort(byUrgency);
@@ -233,6 +242,13 @@ export function FocusView() {
   // Read from the store rather than held in state, so completing steps inside
   // focus mode re-renders it with the task's current shape.
   const focusTask = data.tasks.find((task) => task.id === focusTaskId) ?? null;
+  // The most recent reading filed under whatever is up next.
+  const courseReading =
+    nextUp?.courseId == null
+      ? null
+      : (data.documents
+          .filter((document) => document.courseId === nextUp.courseId)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null);
   const hour = new Date().getHours();
 
   return (
@@ -353,9 +369,36 @@ export function FocusView() {
                   </p>
                 ) : null}
 
+                {/* If this course has a reading, the way in is the document
+                    itself — not a trip through the library to find it. */}
+                {courseReading ? (
+                  <Link
+                    href={`/reader/${courseReading.id}`}
+                    className="block rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm underline-offset-4 hover:underline"
+                  >
+                    <span className="text-[var(--color-ink-muted)]">Open the reading: </span>
+                    {courseReading.title}
+                  </Link>
+                ) : null}
+
                 <div className="flex flex-wrap gap-3">
-                  <Button variant="primary" onClick={() => setFocusTaskId(nextUp.id)}>
-                    Start a focus session
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setStartMinutes(5);
+                      setFocusTaskId(nextUp.id);
+                    }}
+                  >
+                    Just five minutes
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setStartMinutes(DEFAULT_FOCUS_MINUTES);
+                      setFocusTaskId(nextUp.id);
+                    }}
+                  >
+                    A full session
                   </Button>
                   {nextUp.subtasks.length === 0 ? (
                     <Button variant="secondary" onClick={() => setBreakdownTask(nextUp)}>
@@ -384,6 +427,52 @@ export function FocusView() {
                     }
                   />
                 ))}
+              </Card>
+            </section>
+          ) : null}
+
+          {load.crowded ? (
+            <section className="space-y-4">
+              <Card className="space-y-2 border-[#e2c9a9] bg-[#faf3e8] dark:border-[#5c4a33] dark:bg-[#332a1f]">
+                <p className="text-sm font-medium">
+                  The rest of this week is {describeHours(load.minutes)} of planned
+                  work across {load.daysLeft} {load.daysLeft === 1 ? "day" : "days"}.
+                </p>
+                <p className="text-sm text-[var(--color-ink-muted)]">
+                  That is more than the evenings hold. Nothing is wrong — but this is
+                  the week to move something, not the week to find out on Friday.{" "}
+                  <Link href="/tasks" className="underline underline-offset-4">
+                    Look at what is planned
+                  </Link>
+                  .
+                </p>
+              </Card>
+            </section>
+          ) : null}
+
+          {done.steps + done.tasks > 0 ? (
+            <section className="space-y-4">
+              <CardTitle>The last seven days</CardTitle>
+              <Card>
+                <p className="text-sm">
+                  {[
+                    done.steps > 0
+                      ? `${done.steps} ${done.steps === 1 ? "step" : "steps"} ticked off`
+                      : null,
+                    done.tasks > 0
+                      ? `${done.tasks} ${done.tasks === 1 ? "assignment" : "assignments"} finished`
+                      : null,
+                    done.minutes > 0 ? `${describeHours(done.minutes)} of focus` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}
+                  .
+                </p>
+                {/* Kept because the feeling on a Friday evening is "I got
+                    nothing done" almost regardless of what happened. */}
+                <p className="mt-1 text-sm text-[var(--color-ink-muted)]">
+                  That happened. It is easy to finish a week convinced it did not.
+                </p>
               </Card>
             </section>
           ) : null}
@@ -445,7 +534,14 @@ export function FocusView() {
       )}
 
       {focusTask ? (
-        <FocusMode task={focusTask} onExit={() => setFocusTaskId(null)} />
+        <FocusMode
+          task={focusTask}
+          startMinutes={startMinutes}
+          // Already counting: nothing should stand between deciding to start
+          // and having started.
+          autoStart
+          onExit={() => setFocusTaskId(null)}
+        />
       ) : null}
 
       <BreakdownDialog
