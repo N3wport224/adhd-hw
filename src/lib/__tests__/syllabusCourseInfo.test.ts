@@ -225,3 +225,30 @@ test("takes the name from under an Instructor heading", () => {
 test("never reports the heading itself as the instructor", () => {
   assert.equal(parseCourseDetails(["Instructor Information"]).instructor, null);
 });
+
+test("peels stacked office-hours labels down to the answer", () => {
+  // Real syllabi name the same thing two or three times before saying
+  // anything: cutting at the first label left "Student Hours: Office hours by
+  // appointment only" on the course page.
+  assert.equal(
+    parseCourseDetails(["Office Hours/Student Hours: Office hours by appointment only"]).officeHours,
+    "By appointment only",
+  );
+  assert.equal(
+    parseCourseDetails(["Office Hours: By appointment"]).officeHours,
+    "By appointment",
+  );
+});
+
+test("does not mistake a clock time for a label when peeling", () => {
+  // "Mon 3:" looks like a label if digits are allowed in one, and the answer
+  // would come back as "00-5:00pm".
+  assert.equal(
+    parseCourseDetails(["Office Hours: Mon 3:00-5:00pm, Kemeny 318"]).officeHours,
+    "Mon 3:00-5:00pm, Kemeny 318",
+  );
+  assert.equal(
+    parseCourseDetails(["Office hours are Tuesday and Thursday, 11:00am to 1:00pm"]).officeHours,
+    "Tuesday and Thursday, 11:00am to 1:00pm",
+  );
+});

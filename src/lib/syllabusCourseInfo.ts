@@ -216,6 +216,42 @@ const MEETING_LINE =
 /** Past this a line is a sentence about the class, not a statement of when it meets. */
 const MEETING_LINE_LENGTH = 120;
 
+/**
+ * A label made only of words — "Student Hours:", "Drop-in:". Digits are
+ * excluded deliberately: without that, "Mon 3:00-5:00pm" reads "Mon 3:" as a
+ * label and the answer becomes "00-5:00pm".
+ */
+const WORD_LABEL = /^[A-Za-z][A-Za-z\s-]{0,30}:\s*/;
+
+/** A second "office hours" left over inside the value itself. */
+const REPEATED_LABEL = /^office\s+hours?\b\s*(?:are|is|:)?\s*/i;
+
+/**
+ * What a line actually says the office hours are.
+ *
+ * Syllabi stack labels: "Office Hours/Student Hours: Office hours by
+ * appointment only" names the same thing three times before saying anything.
+ * Cutting at the first one left "Student Hours: Office hours by appointment
+ * only" on the course page, so the labels are peeled until words are left.
+ */
+function officeHoursValue(text: string): string | null {
+  let value = text.replace(/^.*?\boffice\s+hours?\b\s*(are|:|is)?\s*/i, "");
+
+  // Bounded: two labels is already unusual, and peeling forever would eat a
+  // value that legitimately contains one.
+  for (let pass = 0; pass < 2; pass += 1) {
+    const before = value;
+    value = value.replace(/^[^A-Za-z0-9]+/, "").replace(REPEATED_LABEL, "");
+    if (!REPEATED_LABEL.test(before)) value = value.replace(WORD_LABEL, "");
+    if (value === before) break;
+  }
+
+  value = value.replace(/[.\s]+$/, "").trim();
+  if (!value) return null;
+  // Reads as a sentence after the "Office hours:" the page puts in front.
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 const OFFICE_HOURS_LINE = /\boffice\s+hours?\b/i;
 
 const INSTRUCTOR_LINE =
@@ -296,15 +332,7 @@ export function parseCourseDetails(paragraphs: string[]): CourseDetails {
       }
 
       if (OFFICE_HOURS_LINE.test(text)) {
-        if (!officeHours) {
-          officeHours = text
-            .replace(/^.*?\boffice\s+hours?\b\s*(are|:|is)?\s*/i, "")
-            // A syllabus that writes "Office Hours/Student Hours:" leaves the
-            // slash behind when the label is cut off.
-            .replace(/^[^A-Za-z0-9]+/, "")
-            .replace(/[.\s]+$/, "")
-            .trim() || null;
-        }
+        if (!officeHours) officeHours = officeHoursValue(text);
         // Office hours are also days and times; without this they would be
         // mistaken for when the class itself meets.
         continue;
