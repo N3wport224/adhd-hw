@@ -191,6 +191,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         fresh.push({
           ...draft,
           id: createId(),
+          // Steps get their own ids here too. A step is addressed by id when
+          // it is ticked off, so a draft that arrives without one — or with
+          // the same one on every step — would tick the wrong box.
+          subtasks: draft.subtasks.map((step) => ({ ...step, id: createId() })),
           pomodorosCompleted: 0,
           createdAt: now,
           updatedAt: now,

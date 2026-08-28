@@ -1,4 +1,5 @@
 import { addDays, startOfWeek, termBounds, toDayKey } from "@/lib/schedule";
+import { createId } from "@/lib/utils";
 import type { Course, SubTask, Task, TaskDraft, Weekday } from "@/types";
 
 /** One week of term, and the days this course actually meets inside it. */
@@ -114,7 +115,8 @@ export function lectureTaskDrafts(course: Course): TaskDraft[] {
   const location = course.meetingPattern?.location ?? "";
 
   return lectureWeeks(course).map((week) => {
-    const subtasks: Omit<SubTask, "id">[] = week.sessions.map((dayKey) => ({
+    const subtasks: SubTask[] = week.sessions.map((dayKey) => ({
+      id: createId(),
       title: sessionTitle(dayKey, synchronous),
       done: false,
       estimatedMinutes,
@@ -131,8 +133,7 @@ export function lectureTaskDrafts(course: Course): TaskDraft[] {
       notes: location ? `In ${location}.` : "",
       dueAt: new Date(`${lastSession}T00:00:00`).toISOString(),
       status: "todo" as const,
-      // Ids are assigned by the store on the way in.
-      subtasks: subtasks as SubTask[],
+      subtasks,
       source: { kind: "lectures" as const, weekStart: week.weekStart },
     };
   });

@@ -96,6 +96,19 @@ test("builds one task a week, with a step for each class", () => {
   assert.deepEqual(first.subtasks.map((step) => step.estimatedMinutes), [75, 75, 75]);
 });
 
+test("gives every step an id of its own", () => {
+  // A step is addressed by id when it is ticked off. Sharing one — or having
+  // none — means ticking a lecture marks a different one done.
+  const drafts = lectureTaskDrafts(course({ meetingPattern: mwf }));
+  const ids = drafts.flatMap((draft) => draft.subtasks.map((step) => step.id));
+  assert.equal(ids.length, 9);
+  assert.ok(
+    ids.every((id) => typeof id === "string" && id.length > 0),
+    "every step needs an id",
+  );
+  assert.equal(new Set(ids).size, ids.length, "ids must be distinct");
+});
+
 test("falls due on the last class of the week", () => {
   const [first] = lectureTaskDrafts(course({ meetingPattern: mwf }));
   assert.equal(first.dueAt, new Date("2026-09-11T00:00:00").toISOString());

@@ -5,7 +5,12 @@ import { useAppData } from "@/lib/appData";
 import { BREAKDOWN_TEMPLATES, suggestSteps, templateForTitle } from "@/lib/taskBreakdown";
 import { createId, cn } from "@/lib/utils";
 import { Dialog } from "@/components/ui/Dialog";
-import { PlanAcrossDays } from "@/components/tasks/PlanAcrossDays";
+import {
+  DEFAULT_PLAN,
+  PlanAcrossDays,
+  planDaysFor,
+  type PlanSettings,
+} from "@/components/tasks/PlanAcrossDays";
 import { dayKeyOf } from "@/lib/schedule";
 import { controlClass } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
@@ -36,7 +41,9 @@ function BreakdownForm({ task, onClose }: { task: Task; onClose(): void }) {
   const [templateId, setTemplateId] = useState(matched?.id ?? "");
   const [steps, setSteps] = useState<string[]>(() => suggestSteps(task.title));
   const [chosen, setChosen] = useState<boolean[]>(() => suggestSteps(task.title).map(() => true));
-  const [plannedDays, setPlannedDays] = useState<string[] | null>(null);
+  // The settings live here, and the days are worked out from them at the
+  // moment the steps are written — so nothing has to be reported upward.
+  const [plan, setPlan] = useState<PlanSettings>(DEFAULT_PLAN);
 
   function applyTemplate(id: string) {
     setTemplateId(id);
@@ -48,9 +55,13 @@ function BreakdownForm({ task, onClose }: { task: Task; onClose(): void }) {
   }
 
   function handleApply() {
-    const kept = steps
+    const titles = steps
       .map((title, position) => ({ title: title.trim(), keep: chosen[position] }))
-      .filter((step) => step.keep && step.title.length > 0)
+      .filter((step) => step.keep && step.title.length > 0);
+
+    const plannedDays = planDaysFor(titles.length, task.dueAt ? dayKeyOf(task.dueAt) : null, plan);
+
+    const kept = titles
       .map((step, position) => ({
         id: createId(),
         title: step.title,
@@ -133,7 +144,8 @@ function BreakdownForm({ task, onClose }: { task: Task; onClose(): void }) {
         <PlanAcrossDays
           stepCount={keptCount}
           due={task.dueAt ? dayKeyOf(task.dueAt) : null}
-          onChange={setPlannedDays}
+          settings={plan}
+          onChange={setPlan}
         />
       ) : null}
 

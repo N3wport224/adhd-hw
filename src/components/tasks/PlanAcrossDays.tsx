@@ -1,20 +1,50 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { describePlan, planStepDays } from "@/lib/stepPlanner";
 import { toDayKey } from "@/lib/schedule";
 import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
 import { cn } from "@/lib/utils";
+
+/** What the student has chosen; the days themselves are derived from it. */
+export interface PlanSettings {
+  on: boolean;
+  perDay: number;
+  skipWeekends: boolean;
+}
+
+/** Switched on by default — a deadline makes a plan obviously useful. */
+export const DEFAULT_PLAN: PlanSettings = { on: true, perDay: 2, skipWeekends: false };
+
+/**
+ * One day per step, or null when the plan is switched off.
+ *
+ * Exported so the form that submits the steps works out the days itself at
+ * the moment it needs them. The control below used to report them upward as
+ * it rendered, which meant a child setting state on its parent mid-render —
+ * React warns about exactly that, because the update can be dropped.
+ */
+export function planDaysFor(
+  stepCount: number,
+  due: string | null,
+  settings: PlanSettings,
+): string[] | null {
+  if (!settings.on) return null;
+  return planStepDays(stepCount, {
+    from: toDayKey(new Date()),
+    due,
+    perDay: settings.perDay,
+    skipWeekends: settings.skipWeekends,
+  }).days;
+}
 
 interface PlanAcrossDaysProps {
   /** How many steps are being planned. */
   stepCount: number;
   /** The task's deadline as a local day, or null. */
   due: string | null;
-  /** Called whenever the plan changes, with one day per step, or null when off. */
-  onChange(days: string[] | null): void;
-  /** Start switched on — true where a deadline makes a plan obviously useful. */
-  defaultOn?: boolean;
+  settings: PlanSettings;
+  onChange(next: PlanSettings): void;
 }
 
 const PACES = [1, 2, 3] as const;
@@ -27,15 +57,8 @@ const PACES = [1, 2, 3] as const;
  * control that turns "four chapters by Friday" into something that shows up
  * on a Tuesday.
  */
-export function PlanAcrossDays({
-  stepCount,
-  due,
-  onChange,
-  defaultOn = true,
-}: PlanAcrossDaysProps) {
-  const [enabled, setEnabled] = useState(defaultOn);
-  const [perDay, setPerDay] = useState(2);
-  const [skipWeekends, setSkipWeekends] = useState(false);
+export function PlanAcrossDays({ stepCount, due, settings, onChange }: PlanAcrossDaysProps) {
+  const { on: enabled, perDay, skipWeekends } = settings;
 
   const summary = useMemo(
     () =>
@@ -48,16 +71,6 @@ export function PlanAcrossDays({
     [stepCount, due, perDay, skipWeekends],
   );
 
-  // Reported during render rather than from an effect: the parent only needs
-  // the current answer at submit time, and an effect here would fire on every
-  // keystroke in the step list above.
-  const days = enabled ? summary.days : null;
-  const [reported, setReported] = useState<string[] | null | undefined>(undefined);
-  if (reported === undefined || JSON.stringify(reported) !== JSON.stringify(days)) {
-    setReported(days);
-    onChange(days);
-  }
-
   const lastDay = summary.days.at(-1);
 
   return (
@@ -66,7 +79,7 @@ export function PlanAcrossDays({
         <input
           type="checkbox"
           checked={enabled}
-          onChange={() => setEnabled((value) => !value)}
+          onChange={() => onChange({ ...settings, on: !enabled })}
           className="mt-0.5 size-4 accent-[var(--color-accent)]"
         />
         <span>
@@ -85,7 +98,7 @@ export function PlanAcrossDays({
               label="Steps a day"
               choices={PACES.map((pace) => ({ value: String(pace), label: String(pace) }))}
               value={String(perDay)}
-              onSelect={(next) => setPerDay(Number(next))}
+              onSelect={(next) => onChange({ ...settings, perDay: Number(next) })}
               className="flex gap-2"
               optionClassName={(selected) =>
                 cn(
@@ -102,7 +115,7 @@ export function PlanAcrossDays({
               <input
                 type="checkbox"
                 checked={skipWeekends}
-                onChange={() => setSkipWeekends((value) => !value)}
+                onChange={() => onChange({ ...settings, skipWeekends: !skipWeekends })}
                 className="size-4 accent-[var(--color-accent)]"
               />
               Skip weekends
