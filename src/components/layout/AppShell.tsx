@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 import { SaveErrorBanner } from "@/components/layout/SaveErrorBanner";
+import { ReminderWatch } from "@/components/layout/ReminderWatch";
 
 /**
  * The persistent frame every screen renders inside: a fixed sidebar on large
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_1fr]">
+      <ReminderWatch />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-[var(--color-surface)] focus:px-4 focus:py-3 focus:shadow-lg"

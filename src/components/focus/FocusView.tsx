@@ -92,7 +92,7 @@ function PlannedStepRow({
   entry: { task: Task; step: Task["subtasks"][number] };
   today: string;
 }) {
-  const { data, toggleSubtask } = useAppData();
+  const { data, toggleSubtask, setSubtaskDay } = useAppData();
   const [justCompleted, setJustCompleted] = useState(false);
   const course = data.courses.find((item) => item.id === entry.task.courseId) ?? null;
   const done = entry.step.done;
@@ -160,8 +160,29 @@ function PlannedStepRow({
           ) : null}
         </p>
       </div>
+
+      {/* Deciding not to today is a different act from quietly failing to.
+          Without a way to say it, a day you were never going to manage just
+          rots into "carried over" and the plan stops being true. */}
+      {!done ? (
+        <button
+          type="button"
+          onClick={() => setSubtaskDay(entry.task.id, entry.step.id, tomorrow(today))}
+          className="shrink-0 rounded-lg px-2 py-1 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+        >
+          Not today
+          <span className="sr-only">: move {entry.step.title} to tomorrow</span>
+        </button>
+      ) : null}
     </div>
   );
+}
+
+/** The day after a local day key. */
+function tomorrow(day: string) {
+  const date = new Date(`${day}T00:00:00`);
+  date.setDate(date.getDate() + 1);
+  return toDayKey(date);
 }
 
 function greeting(hour: number) {
@@ -361,6 +382,13 @@ export function FocusView() {
                     }
                   />
                 </div>
+
+                {nextUp.resumeNote ? (
+                  <p className="rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm">
+                    <span className="text-[var(--color-ink-muted)]">Where you got to: </span>
+                    {nextUp.resumeNote}
+                  </p>
+                ) : null}
 
                 {nextStep ? (
                   <p className="rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm">

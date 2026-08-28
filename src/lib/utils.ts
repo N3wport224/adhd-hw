@@ -67,3 +67,19 @@ export function plural(word: string, count: number): string {
   if (/[^aeiou]y$/i.test(word)) return `${head}ies`;
   return `${word}s`;
 }
+
+/**
+ * The inverse of `plural`, for comparing a task against a grading category.
+ * "Quizzes" and "Quiz 7" have to meet somewhere, and they meet here.
+ */
+export function singular(word: string): string {
+  const lower = word.toLowerCase();
+  if (/[^aeiou]ies$/.test(lower)) return `${lower.slice(0, -3)}y`;
+  if (/(?:ss|sh|ch|x|z)es$/.test(lower)) {
+    const base = lower.slice(0, -2);
+    // "quizzes" loses the doubled letter that the plural added.
+    return /([^aeiou])\1$/.test(base) ? base.slice(0, -1) : base;
+  }
+  if (/[^s]s$/.test(lower)) return lower.slice(0, -1);
+  return lower;
+}

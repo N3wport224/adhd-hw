@@ -63,10 +63,32 @@ test("uses your own record where there is one", () => {
   assert.equal(load.minutes, 4 * 30);
 });
 
-test("says so when the week does not fit in the evenings left", () => {
+test("stays quiet when the week is priced from guesses", () => {
+  // Forty steps at the assumed half-hour is twenty hours — but nothing here
+  // was ever measured, and a week of short discussion posts would look like a
+  // crisis. A warning that cries wolf is worse than silence.
   const many = Array.from({ length: 40 }, (_, i) => step(`s${i}`, "2026-09-15"));
   const load = weekLoad([task("Big", many)], MONDAY);
-  // Forty half-hour steps is twenty hours across six evenings.
+  assert.equal(load.measured, 0);
+  assert.equal(load.crowded, false);
+});
+
+test("speaks up once the week is priced from what things really took", () => {
+  const history = [
+    task("Reading 1", [], { focusMinutes: 240 }),
+    task("Reading 2", [], { focusMinutes: 240 }),
+  ];
+  // Four steps a task, so each is an hour of measured work. Six evenings
+  // hold eighteen hours; twenty hours does not fit.
+  const planned = Array.from({ length: 5 }, (_, n) =>
+    task(
+      `Reading ${n + 3}`,
+      ["a", "b", "c", "d"].map((id) => step(`${n}${id}`, "2026-09-15")),
+    ),
+  );
+  const load = weekLoad([...history, ...planned], MONDAY);
+  assert.equal(load.measured, 20);
+  assert.equal(load.minutes, 20 * 60);
   assert.equal(load.crowded, true);
 });
 

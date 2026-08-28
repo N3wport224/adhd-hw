@@ -5,17 +5,18 @@ import { useLatestRef } from "@/lib/useLatestRef";
 import Link from "next/link";
 import { documentBlocks, useAppData, useDocument } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
-import { estimateMinutes, toSentences } from "@/lib/documents/sentences";
+import { estimateMinutes, toSentences, type Sentence } from "@/lib/documents/sentences";
 import { useSpeechReader } from "@/lib/speech";
 import { useReaderSettings } from "@/lib/readerSettings";
 import { ReaderSettingsPanel } from "@/components/reader/ReaderSettingsPanel";
-import { cn } from "@/lib/utils";
+import { cn, createId } from "@/lib/utils";
 import { LinkButton } from "@/components/ui/Button";
 import { controlClass } from "@/components/ui/Field";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ReaderControls } from "@/components/reader/ReaderControls";
+import { KeepNoteDialog } from "@/components/reader/KeepNoteDialog";
 import { ReaderPane } from "@/components/reader/ReaderPane";
-import type { StudyDocument } from "@/types";
+import type { DocumentNote, StudyDocument } from "@/types";
 
 export interface ReaderSection {
   title: string;
@@ -136,6 +137,12 @@ export function ReaderView({ documentId }: { documentId: string }) {
 
 function DocumentReader({ document }: { document: StudyDocument }) {
   const { data, updateDocument } = useAppData();
+  // A sentence on its way to becoming a note.
+  const [keeping, setKeeping] = useState<Sentence | null>(null);
+  const keptIndices = useMemo(
+    () => new Set((document.notes ?? []).map((note) => note.sentenceIndex)),
+    [document.notes],
+  );
   const documentId = document.id;
 
   // Sentences are derived, never stored: one splitter owns the numbering, so a
@@ -410,7 +417,63 @@ function DocumentReader({ document }: { document: StudyDocument }) {
         charIndex={reader.charIndex}
         speaking={reader.status === "playing"}
         onSelectSentence={(index) => reader.jumpTo(index)}
+        onKeep={(sentence) => setKeeping(sentence)}
+        kept={keptIndices}
         settings={settings}
+      />
+
+      {(document.notes ?? []).length > 0 ? (
+        <section className="mx-auto mb-8 w-full max-w-3xl space-y-3 rounded-[var(--radius-card)] border border-[var(--color-border-soft)] bg-[var(--color-surface)] p-5">
+          <h2 className="text-base font-semibold">
+            Kept from this reading ({(document.notes ?? []).length})
+          </h2>
+          <ul className="space-y-3">
+            {(document.notes ?? []).map((note) => (
+              <li key={note.id} className="flex items-start gap-3 text-sm">
+                <button
+                  type="button"
+                  onClick={() => reader.jumpTo(note.sentenceIndex)}
+                  className="min-w-0 flex-1 rounded-lg px-2 py-1 text-left transition hover:bg-[var(--color-surface-muted)]"
+                >
+                  <span className="block border-l-2 border-[var(--color-accent)] pl-2 text-[var(--color-ink-muted)]">
+                    {note.quote}
+                  </span>
+                  {note.comment ? <span className="mt-1 block">{note.comment}</span> : null}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove note: ${note.quote.slice(0, 40)}`}
+                  onClick={() =>
+                    updateDocument(document.id, {
+                      notes: (document.notes ?? []).filter((item) => item.id !== note.id),
+                    })
+                  }
+                  className="shrink-0 rounded-lg px-2 py-1 text-xs text-[var(--color-ink-muted)] transition hover:bg-[var(--color-surface-muted)] hover:text-[var(--color-ink)]"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <KeepNoteDialog
+        open={keeping !== null}
+        sentence={keeping}
+        onClose={() => setKeeping(null)}
+        onSave={(comment) => {
+          if (!keeping) return;
+          const note: DocumentNote = {
+            id: createId(),
+            sentenceIndex: keeping.index,
+            quote: keeping.text,
+            comment,
+            createdAt: new Date().toISOString(),
+          };
+          updateDocument(document.id, { notes: [...(document.notes ?? []), note] });
+          setKeeping(null);
+        }}
       />
     </div>
   );

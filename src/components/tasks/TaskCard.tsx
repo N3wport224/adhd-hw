@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { describeShare, taskShareOf } from "@/lib/taskWeight";
 import { useAppData } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { cn, describeDueDate, daysUntil } from "@/lib/utils";
@@ -29,6 +30,7 @@ export function TaskCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const course = data.courses.find((item) => item.id === task.courseId) ?? null;
+  const share = describeShare(taskShareOf(task, course, data.tasks));
   const done = task.status === "done";
   const overdue = !done && task.dueAt !== null && daysUntil(task.dueAt) < 0;
   const doneSteps = task.subtasks.filter((step) => step.done).length;
@@ -114,6 +116,9 @@ export function TaskCard({
                 {task.pomodorosCompleted === 1 ? "block" : "blocks"}
               </span>
             ) : null}
+            {/* Only where it is big enough to change what you drop on a bad
+                week. One percent of the grade is noise on a card. */}
+            {share ? <span className="font-medium">{share}</span> : null}
           </p>
         </div>
 

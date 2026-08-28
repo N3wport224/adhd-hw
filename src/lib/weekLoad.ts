@@ -18,6 +18,9 @@ const UNKNOWN_STEP_MINUTES = 30;
 /** Hours in an evening, for someone whose classes run 5:15 to 8. */
 const EVENING_HOURS = 3;
 
+/** The share of the week that must be priced from real history to speak up. */
+const MOSTLY_MEASURED = 0.6;
+
 export interface WeekLoad {
   /** Steps planned from today to the end of the week. */
   steps: number;
@@ -26,6 +29,8 @@ export interface WeekLoad {
   daysLeft: number;
   /** True when the plan needs more of each remaining day than an evening holds. */
   crowded: boolean;
+  /** How much of the estimate came from something actually measured. */
+  measured: number;
 }
 
 /**
@@ -39,17 +44,17 @@ export function weekLoad(tasks: Task[], today = new Date()): WeekLoad {
 
   let steps = 0;
   let minutes = 0;
+  let measured = 0;
 
   for (let day = new Date(today); toDayKey(day) <= endOfWeek; day = addDays(day, 1)) {
     for (const entry of stepsOnDay(tasks, toDayKey(day))) {
       if (entry.step.done) continue;
       steps += 1;
-      minutes +=
-        entry.step.estimatedMinutes ??
-        // A task's whole history divided by its steps: the record is kept
-        // against the task, but what is planned for a day is one step of it.
-        stepShare(efforts, entry.task) ??
-        UNKNOWN_STEP_MINUTES;
+      // A task's whole history divided by its steps: the record is kept
+      // against the task, but what is planned for a day is one step of it.
+      const known = entry.step.estimatedMinutes ?? stepShare(efforts, entry.task);
+      if (known !== null && known !== undefined) measured += 1;
+      minutes += known ?? UNKNOWN_STEP_MINUTES;
     }
   }
 
@@ -66,7 +71,15 @@ export function weekLoad(tasks: Task[], today = new Date()): WeekLoad {
     steps,
     minutes,
     daysLeft,
-    crowded: minutes > daysLeft * EVENING_HOURS * 60,
+    measured,
+    // Only worth saying out loud when most of the estimate is measured rather
+    // than assumed. Priced at half an hour a step, a week of short discussion
+    // posts looks like a crisis — and a warning that cries wolf is worse than
+    // silence in an app whose whole point is not manufacturing dread.
+    crowded:
+      steps > 0 &&
+      measured / steps >= MOSTLY_MEASURED &&
+      minutes > daysLeft * EVENING_HOURS * 60,
   };
 }
 

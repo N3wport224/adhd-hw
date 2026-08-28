@@ -13,6 +13,12 @@ import {
   parseBackup,
   type MergeReport,
 } from "@/lib/backup";
+import {
+  enableReminders,
+  setRemindersOn,
+  useRemindersOn,
+  useRemindersSupported,
+} from "@/lib/reminders";
 import { useStoragePersistence } from "@/lib/storagePersistence";
 import { cn, createId } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -45,6 +51,9 @@ export function SettingsView() {
 
   const [notice, setNotice] = useState<Notice>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const remindersOn = useRemindersOn();
+  const remindersWork = useRemindersSupported();
+  const [remindersBlocked, setRemindersBlocked] = useState(false);
 
   const backupSize = useMemo(() => (ready ? estimateBackupBytes(data) : 0), [data, ready]);
   const counts = {
@@ -208,6 +217,58 @@ export function SettingsView() {
               </p>
             </>
           )}
+        </Card>
+      </section>
+
+      <section className="space-y-4">
+        <CardTitle>Let it speak first</CardTitle>
+        <Card className="space-y-4">
+          {!remindersWork ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              This browser cannot show notifications, so nothing here can nudge you.
+            </p>
+          ) : remindersOn ? (
+            <>
+              <p className="text-sm">
+                <span aria-hidden="true">\u2713 </span>
+                On. You will hear from it fifteen minutes before a class, and once in
+                the evening if the day&rsquo;s steps are still untouched.
+              </p>
+              <Button variant="secondary" onClick={() => setRemindersOn(false)}>
+                Turn reminders off
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-[var(--color-ink-muted)]">
+                Everything else here waits to be opened. Reminders are the one part
+                that starts the conversation: fifteen minutes before a class, and an
+                evening nudge naming the first thing you planned for today.
+              </p>
+              <Button
+                variant="primary"
+                onClick={async () => {
+                  const permission = await enableReminders();
+                  setRemindersBlocked(permission !== "granted");
+                }}
+              >
+                Turn reminders on
+              </Button>
+              {remindersBlocked ? (
+                <p className="text-sm text-[#a8503f] dark:text-[#e29b8b]">
+                  The browser said no. Notifications for this site have to be allowed
+                  in its own settings before this can do anything.
+                </p>
+              ) : null}
+            </>
+          )}
+          {/* Said plainly rather than discovered later: there is no service
+              worker and no server here, and pretending otherwise would be
+              worse than the limit itself. */}
+          <p className="text-sm text-[var(--color-ink-muted)]">
+            These only arrive while a tab of Steady is open somewhere. Nothing is
+            sent through a server \u2014 which is why they cannot reach a closed browser.
+          </p>
         </Card>
       </section>
 

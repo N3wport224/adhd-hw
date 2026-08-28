@@ -12,16 +12,6 @@ export interface LectureWeek {
   sessions: string[];
 }
 
-const DAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-
 /** Where a week's lecture lands when the course has no meeting days on file. */
 const ASYNC_WEEKDAY = 1;
 
@@ -80,17 +70,21 @@ export function lectureWeeks(course: Course): LectureWeek[] {
 }
 
 /**
- * "Monday's lecture" — the weekday and nothing else.
+ * "Lecture 1 of 3" — which one, not which day.
  *
- * The time is deliberately left out. It is already on the class block sitting
- * directly above the step in the week view, and on the course header; adding
- * it here only pushed the title past what a calendar chip can show, so every
- * lecture read as "Monday's lecture, 10:0…". The weekday is what tells the
- * three steps of a week apart.
+ * The weekday was misleading. Plenty of courses meet on a schedule and post
+ * the recording, and for anyone watching the recording the day it was given
+ * is not the day they watch it — so "Monday's lecture" implied a timetable
+ * that does not apply to them. The number is true either way, and the day it
+ * is planned for is already on the step.
+ *
+ * The time is deliberately absent too: it is on the class block directly
+ * above the step in the week view, and including it pushed every title past
+ * what a calendar chip can show.
  */
-function sessionTitle(dayKey: string, synchronous: boolean) {
+function sessionTitle(position: number, total: number, synchronous: boolean) {
   if (!synchronous) return "Watch this week's lectures";
-  return `${DAY_NAMES[new Date(`${dayKey}T00:00:00`).getDay()]}'s lecture`;
+  return total === 1 ? "Lecture" : `Lecture ${position} of ${total}`;
 }
 
 /**
@@ -115,9 +109,9 @@ export function lectureTaskDrafts(course: Course): TaskDraft[] {
   const location = course.meetingPattern?.location ?? "";
 
   return lectureWeeks(course).map((week) => {
-    const subtasks: SubTask[] = week.sessions.map((dayKey) => ({
+    const subtasks: SubTask[] = week.sessions.map((dayKey, position) => ({
       id: createId(),
-      title: sessionTitle(dayKey, synchronous),
+      title: sessionTitle(position + 1, week.sessions.length, synchronous),
       done: false,
       estimatedMinutes,
       plannedFor: dayKey,

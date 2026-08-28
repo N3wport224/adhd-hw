@@ -201,6 +201,13 @@ function ReviewForm({
 }: SyllabusReviewModalProps) {
   const { data, importTasks, updateCourse } = useAppData();
 
+  // Declared before the row state that reads it: a lazy useState initializer
+  // runs during this call, so a const declared further down is still in its
+  // temporal dead zone and blows the whole screen up.
+  const hasFeed = data.tasks.some(
+    (task) => task.courseId === course.id && task.source?.kind === "calendar",
+  );
+
   const [rows, setRows] = useState<Row[]>(() =>
     result.assignments.map((assignment) => ({
       id: assignment.id,
@@ -215,7 +222,11 @@ function ReviewForm({
       selected:
         assignment.confidence !== "low" &&
         assignment.dueAt !== null &&
-        assignment.dueAt <= horizon(),
+        assignment.dueAt <= horizon() &&
+        // A course whose dates already came from its calendar feed does not
+        // need them guessed at from prose. The grading breakdown and the
+        // course details are what this scan is still the only source of.
+        !hasFeed,
       title: assignment.title,
       dueAt: assignment.dueAt ?? "",
       rawDate: assignment.rawDate,
@@ -329,8 +340,6 @@ function ReviewForm({
     return `Add ${parts.join(" and ")}`;
   })();
 
-  // What the checked rows amount to, so the shape of the import can be read
-  // without going down forty near-identical lines.
   const laterCount = rows.filter(
     (row) => !row.selected && row.dueAt !== "" && row.dueAt > horizon(),
   ).length;
@@ -476,7 +485,15 @@ function ReviewForm({
             </div>
           </div>
 
-          {laterCount > 0 ? (
+          {hasFeed ? (
+            <p className="rounded-xl bg-[var(--color-accent-wash)] px-4 py-3 text-sm">
+              This course already has its dates from its calendar feed, which is
+              the more reliable source — so nothing here is ticked. Tick anything
+              the feed missed.
+            </p>
+          ) : null}
+
+          {laterCount > 0 && !hasFeed ? (
             <p className="text-sm text-[var(--color-ink-muted)]">
               {laterCount} further out than a month {laterCount === 1 ? "is" : "are"} left
               unticked — <button

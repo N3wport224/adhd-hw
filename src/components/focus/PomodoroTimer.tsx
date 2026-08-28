@@ -9,6 +9,7 @@ import {
   usePomodoro,
   type FocusMinutes,
 } from "@/lib/pomodoro";
+import { useLatestRef } from "@/lib/useLatestRef";
 import { cn, formatClock } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { ChoiceGroup } from "@/components/ui/ChoiceGroup";
@@ -22,7 +23,11 @@ interface PomodoroTimerProps {
   completedTotal?: number;
   /** Block length to open on, for an on-ramp that asks for very little. */
   initialMinutes?: FocusMinutes;
-  /** Start counting immediately, so nothing stands between deciding and doing. */
+  /**
+   * Arm the clock rather than run it: it starts on the first thing you
+   * actually do. Auto-running assumed you were ready the instant you clicked,
+   * and the clock ate the time it took to open the reading.
+   */
   autoStart?: boolean;
 }
 
@@ -39,17 +44,35 @@ export function PomodoroTimer({
   const [minutes, setMinutes] = useState<FocusMinutes>(initialMinutes);
   const pomodoro = usePomodoro({ onFocusComplete, focusMinutes: minutes });
   const started = useRef(false);
+  const startRef = useLatestRef(pomodoro.start);
+  const root = useRef<HTMLDivElement>(null);
 
+  // Any real move — a key, a click, a scroll — is the moment the session
+  // actually began. Once only, and never from the click that opened it.
   useEffect(() => {
-    if (!autoStart || started.current) return;
-    started.current = true;
-    pomodoro.start();
-  }, [autoStart, pomodoro]);
+    if (!autoStart) return;
+    const begin = (event: Event) => {
+      if (started.current) return;
+      // Not the timer's own controls. Setting the block length before you
+      // begin is not beginning, and starting on that touch made the length
+      // picker vanish under the finger choosing with it — the buttons here
+      // already say what they do.
+      const target = event.target;
+      if (target instanceof Node && root.current?.contains(target)) return;
+      started.current = true;
+      startRef.current();
+    };
+    const events = ["keydown", "pointerdown", "wheel"] as const;
+    for (const name of events) window.addEventListener(name, begin);
+    return () => {
+      for (const name of events) window.removeEventListener(name, begin);
+    };
+  }, [autoStart, startRef]);
   const focusing = pomodoro.phase === "focus";
   const atStart = pomodoro.secondsLeft === phaseSeconds(pomodoro.phase, minutes);
 
   return (
-    <div className="flex flex-col items-center gap-5">
+    <div ref={root} className="flex flex-col items-center gap-5">
       <div className="relative grid place-items-center">
         <svg viewBox="0 0 120 120" aria-hidden="true" className="size-40 -rotate-90">
           <circle

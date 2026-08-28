@@ -86,7 +86,9 @@ test("builds one task a week, with a step for each class", () => {
   assert.equal(first.notes, "In Kemeny 007.");
   assert.deepEqual(
     first.subtasks.map((step) => step.title),
-    ["Monday's lecture", "Wednesday's lecture", "Friday's lecture"],
+    // Which lecture, not which weekday: for a course whose lectures are
+    // watched as recordings, the day it was given is not the day you watch it.
+    ["Lecture 1 of 3", "Lecture 2 of 3", "Lecture 3 of 3"],
   );
   assert.deepEqual(
     first.subtasks.map((step) => step.plannedFor),

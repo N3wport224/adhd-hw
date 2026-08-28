@@ -69,7 +69,7 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 223 cases
+npm test           # node:test over the pure logic — 239 cases
 ```
 
 ## What it does
@@ -99,6 +99,12 @@ where the browser reports boundary events, and the page follows along. Double-cl
 sentence to read from there — deliberately two clicks, and with no hover
 tint, because a pane meant to be read should not flicker under the cursor. Your position is remembered per document.
 
+**K** keeps the sentence under the cursor, with an optional note. Reading with
+the whole thing narrated is the one time you reliably notice the sentence that
+matters, and the alternative was a highlight in a PDF nobody opens again — the
+kept lines are listed under the document, each one a link back to where it was
+said. The comment is optional on purpose: a bare highlight is a note.
+
 **Syllabus parsing** — uploading a document that reads like a syllabus opens a
 review step rather than writing anything. It finds assignments (pairing a date
 with something that sounds like a deliverable) and the grading breakdown, and
@@ -125,6 +131,12 @@ on; month view is there for orientation. Colour is the course. Selecting a day
 opens its full list with working checkboxes, and when the visible span is
 empty it names the next day that has work rather than showing a blank grid
 that looks like a broken import.
+
+**What a piece of work is worth** — a task carries the share of the final
+grade it represents, worked out from the syllabus's own breakdown and split
+across the items in its category, so thirteen quizzes at 13% read as 1% each
+rather than 13. Shown only above 5%, where it is big enough to change what
+gets dropped on a bad week; below that it is noise on a card.
 
 **Tasks** (`/tasks`) — the full list, grouped by when work is due, with
 anything past this week collapsed. "Break into steps" turns an assignment
@@ -161,8 +173,11 @@ missing, so extending a term tops it up rather than duplicating it.
 **Focus mode** — from the Focus dashboard, one task fills the screen with its
 next step and a timer, and nothing else. Two ways in: **Just five minutes**,
 which is the on-ramp — the hard part is agreeing to begin, and a small enough
-ask is one nobody argues with — or a full session. Either opens already
-counting, so nothing stands between deciding and having started.
+ask is one nobody argues with — or a full session. Either opens *armed* rather
+than running: the clock starts on the first thing you actually do, so the two
+minutes spent finding the reading are not billed to the block. Touching the
+timer's own controls does not count as beginning, so the block length can be
+changed before the clock moves.
 
 The block is 5 to 50 minutes, not a fixed 25: twenty-five is a convention, not
 a finding, and it is both too much to agree to on a bad day and an
@@ -172,6 +187,14 @@ keep going, or take the break — rather than stopping you.
 Pressing **C** parks a stray thought without leaving the session. An intrusive
 "I need to email the TA" costs the whole sitting if acting on it means
 navigating away.
+
+Leaving asks **where did you get to?**, and the answer is shown above the next
+step when the task comes back round. Asked on the way out it is still in your
+head; left as an empty field on a task it would never be filled in, and coming
+back four days later without it means re-deciding where to start rather than
+resuming. A step planned for today that is not going to happen can be moved to
+tomorrow with **Not today**, which is the honest version of leaving it to go
+quietly overdue.
 
 Time spent is recorded in minutes, and once the same kind of work has been
 done twice the app can say what it typically takes — an estimate from your own
@@ -184,6 +207,15 @@ last seven days actually produced. The planner used to spread steps without
 ever saying "this is too much", which quietly confirmed an underestimate; and
 nothing said what a week had produced, which matters because the feeling on a
 Friday evening is "I got nothing done" almost regardless of what happened.
+
+**Reminders** — the one part of the app that speaks first. Everything else is
+pull: it works only if you remember to open it, which is asking exactly what
+ADHD is worst at — prospective memory, the remembering to remember, is the
+deficit. Turned on from settings, a browser notification arrives fifteen
+minutes before a class, and once in the evening if the day's planned steps are
+untouched, naming the first one rather than counting them: "one thing" is a
+number, "read the first half" is something you can picture starting. They only
+fire while a tab is open — see **Known limits**.
 
 **Settings & backup** (`/settings`) — download everything as a JSON file and
 import it back. The date of the last backup is kept per device, and after a
@@ -250,6 +282,8 @@ adhd-hw/
     │   ├── backupReminder.ts           # when this device last backed up
     │   ├── workHistory.ts              # what this kind of work usually costs
     │   ├── weekLoad.ts                 # the week ahead, and the week behind
+    │   ├── taskWeight.ts               # what a task is worth of the final grade
+    │   ├── reminders.ts                # class and evening notifications
     │   ├── useFocusTrap.ts             # focus handling shared by every overlay
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format
@@ -399,6 +433,16 @@ A few decisions worth knowing before extending this:
   percentage — and will miss anything laid out as a table of images, or
   phrased unusually. The review step exists because of this, not in spite
   of it.
+- **Reminders only fire while a tab is open.** Real push would need a service
+  worker and a server to push from, and this app has neither on purpose —
+  everything stays on the device. A closed browser is a silent one.
+- **A low-confidence row near a confident one is dropped.** "There will be a
+  midterm during week 9" is a sentence about the midterm, not a second
+  midterm, so an unsure row within ten days of a confident one of the same
+  kind is treated as an echo of it. Where two genuinely different pieces of
+  work of the same kind fall in the same fortnight and only one was written
+  with a real date, the unsure one is lost — the review step shows what
+  survived, and anything missing can be added by hand.
 - **There is no sync and no account.** Data lives in one browser on one
   device. The backup file is the only way to move it or keep it safe.
 - **Class meetings appear in week view only.** Three classes meeting three

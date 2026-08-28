@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useLatestRef } from "@/lib/useLatestRef";
 import { groupByParagraph, type Sentence } from "@/lib/documents/sentences";
 import {
   LINE_WIDTH_CLASS,
@@ -19,6 +20,10 @@ interface ReaderPaneProps {
   charIndex: number | null;
   speaking: boolean;
   onSelectSentence(index: number): void;
+  /** Keeps a sentence worth keeping. Absent where notes do not apply. */
+  onKeep?(sentence: Sentence): void;
+  /** Sentence indices that already have a note, so they read as marked. */
+  kept?: Set<number>;
   settings: ReaderSettings;
 }
 
@@ -51,10 +56,33 @@ export function ReaderPane({
   charIndex,
   speaking,
   onSelectSentence,
+  onKeep,
+  kept,
   settings,
 }: ReaderPaneProps) {
   const activeRef = useRef<HTMLSpanElement>(null);
   const groups = groupByParagraph(sentences);
+
+  // Whichever sentence the pointer is over, so K needs no aiming.
+  const hovered = useRef<Sentence | null>(null);
+  const keepRef = useLatestRef(onKeep);
+
+  useEffect(() => {
+    if (!onKeep) return;
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (event.key !== "k" || event.metaKey || event.ctrlKey || event.altKey) return;
+      // A selection wins over the pointer: highlighting a phrase and pressing
+      // K should keep the sentence it came from.
+      const chosen = hovered.current;
+      if (!chosen) return;
+      event.preventDefault();
+      keepRef.current?.(chosen);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onKeep, keepRef]);
 
   /**
    * Follows the voice down the page, but only when it has to.
@@ -87,6 +115,7 @@ export function ReaderPane({
     group.map((sentence) => {
       const active = sentence.index === activeIndex;
       const spokenWord = active ? splitAtWord(sentence.text, charIndex) : null;
+      const marked = kept?.has(sentence.index) ?? false;
 
       return (
         // A span, not a button. Chromium forces buttons to `inline-block`,
@@ -100,17 +129,24 @@ export function ReaderPane({
         // the cursor crosses it — that is motion, in the one place motion is
         // least wanted — and a single stray click used to throw the voice
         // somewhere else mid-paragraph.
+        //
+        // Selecting the text and pressing K keeps it; the sentence under the
+        // pointer is the one that gets kept, so nothing has to be aimed at.
         <span
           key={sentence.index}
           ref={active ? activeRef : undefined}
           onDoubleClick={() => onSelectSentence(sentence.index)}
-          title="Double-click to read from here"
+          onPointerEnter={onKeep ? () => (hovered.current = sentence) : undefined}
+          title="Double-click to read from here · K to keep it"
           aria-current={active ? "true" : undefined}
           className={cn(
             "rounded-md transition-colors",
             active
               ? "bg-[var(--color-accent-soft)] text-[var(--color-ink)]"
               : "text-[var(--color-ink)]",
+            // A kept sentence stays marked, quietly: an underline rather than
+            // a highlighter, so the page still reads as a page.
+            marked && !active && "underline decoration-[var(--color-accent)] decoration-2 underline-offset-4",
           )}
         >
           {spokenWord ? (

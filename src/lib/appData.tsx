@@ -56,6 +56,22 @@ interface AppDataValue {
   replaceAll(data: AppData): void;
 }
 
+/**
+ * How far two readings of the same deadline may sit apart.
+ *
+ * A syllabus files a week's work under the Friday; the course feed files it
+ * under the Sunday it is actually due. Both are describing one quiz.
+ */
+const SAME_WORK_DAYS = 4;
+
+/** A title with the punctuation and spacing that two sources disagree about removed. */
+function sameThing(title: string) {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 const AppDataContext = createContext<AppDataValue | null>(null);
 
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
@@ -181,17 +197,48 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           .map((task) => importKey(task.source, task)),
       );
 
+      // The keys above are per-source, which is right for topping one source
+      // up — and useless across two. Scanning the syllabus and then importing
+      // the course feed describes the same term twice, and every quiz landed
+      // in the list a second time. So identity is also checked the way a
+      // person would: same course, same name, around the same day.
+      const already = dataRef.current.tasks
+        .filter((task) => task.source !== undefined)
+        .map((task) => ({
+          courseId: task.courseId,
+          name: sameThing(task.title),
+          day: task.dueAt ? Date.parse(task.dueAt) : null,
+        }));
+
+      const describesSameWork = (draft: TaskDraft) => {
+        const name = sameThing(draft.title);
+        const day = draft.dueAt ? Date.parse(draft.dueAt) : null;
+        return already.some(
+          (task) =>
+            task.courseId === draft.courseId &&
+            task.name === name &&
+            (task.day === null || day === null
+              ? task.day === day
+              : Math.abs(task.day - day) <= SAME_WORK_DAYS * 86_400_000),
+        );
+      };
+
       const now = new Date().toISOString();
       const fresh: Task[] = [];
       let skipped = 0;
 
       for (const draft of drafts) {
         const key = importKey(draft.source, draft);
-        if (existing.has(key)) {
+        if (existing.has(key) || describesSameWork(draft)) {
           skipped += 1;
           continue;
         }
         existing.add(key);
+        already.push({
+          courseId: draft.courseId,
+          name: sameThing(draft.title),
+          day: draft.dueAt ? Date.parse(draft.dueAt) : null,
+        });
         fresh.push({
           ...draft,
           id: createId(),

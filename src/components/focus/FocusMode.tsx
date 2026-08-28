@@ -38,6 +38,7 @@ export function FocusMode({ task, onExit, startMinutes, autoStart }: FocusModePr
   // without the timer or the page moving.
   const [capturing, setCapturing] = useState(false);
   const [caught, setCaught] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const captureField = useRef<HTMLInputElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   // Read by the Escape handler, which must not become a dependency of the
@@ -197,12 +198,49 @@ export function FocusMode({ task, onExit, startMinutes, autoStart }: FocusModePr
           >
             Whole task done
           </Button>
-          <Button variant="ghost" onClick={onExit}>
+          <Button variant="ghost" onClick={() => setLeaving(true)}>
             Leave focus mode
           </Button>
         </div>
 
-        <p className="text-sm text-[var(--color-ink-muted)]">Press Escape to leave.</p>
+        {/* Asked on the way out, when the answer is still in your head —
+            rather than left as an empty field on a task, which nobody fills
+            in. Coming back to something four days later without it means
+            re-deciding where to start instead of resuming. */}
+        {leaving ? (
+          <form
+            className="animate-rise-fade w-full max-w-md space-y-3 rounded-[var(--radius-card)] bg-[var(--color-accent-wash)] p-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const note = new FormData(event.currentTarget).get("resume");
+              updateTask(task.id, { resumeNote: String(note ?? "").trim() || undefined });
+              onExit();
+            }}
+          >
+            <label htmlFor="resume-note" className="block text-sm font-medium">
+              Where did you get to?
+            </label>
+            <input
+              id="resume-note"
+              name="resume"
+              autoFocus
+              defaultValue={task.resumeNote ?? ""}
+              placeholder="Stopped at page 40, next is the risk section…"
+              autoComplete="off"
+              className="min-h-11 w-full rounded-xl border border-[var(--color-border-soft)] bg-[var(--color-surface)] px-3 text-sm"
+            />
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button type="submit" variant="primary">
+                Save and leave
+              </Button>
+              <Button variant="ghost" onClick={onExit}>
+                Leave without a note
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <p className="text-sm text-[var(--color-ink-muted)]">Press Escape to leave.</p>
+        )}
       </div>
     </div>
   );

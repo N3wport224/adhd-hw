@@ -148,6 +148,14 @@ export interface Task {
   focusMinutes?: number;
   /** When the task was finished, for the same reason steps carry one. */
   doneAt?: ISODateString | null;
+  /**
+   * Where you got to, in your own words.
+   *
+   * Put something down four days ago and coming back means re-deciding rather
+   * than resuming — the reader remembers its place, and until now a task did
+   * not.
+   */
+  resumeNote?: string;
   /** Absent for tasks the student typed in themselves. */
   source?: TaskSource;
   createdAt: ISODateString;
@@ -180,6 +188,18 @@ export interface DocumentBlock {
   marker?: string;
 }
 
+/** Something worth keeping out of a reading, with where it came from. */
+export interface DocumentNote {
+  id: string;
+  /** The sentence it was taken from, so it can be found again. */
+  sentenceIndex: number;
+  /** What the document said. */
+  quote: string;
+  /** What you made of it. Optional — a bare highlight is a note too. */
+  comment: string;
+  createdAt: ISODateString;
+}
+
 export interface StudyDocument {
   id: string;
   courseId: string | null;
@@ -199,6 +219,14 @@ export interface StudyDocument {
   blocks?: DocumentBlock[];
   /** Page count for PDFs; null for formats without pages. */
   pageCount: number | null;
+  /**
+   * Passages kept while reading.
+   *
+   * Reading and doing used to be different places: an hour in the reader
+   * produced nothing you could point at, which is exactly when reading stops
+   * happening.
+   */
+  notes?: DocumentNote[];
   /**
    * Sentence index the reader last stopped on, so reopening a document
    * resumes rather than restarting. Sentences are derived from `paragraphs`
