@@ -5,7 +5,12 @@ import { useAppData } from "@/lib/appData";
 import { lectureTaskDrafts, plannedLectureWeeks } from "@/lib/lecturePlan";
 import { formatISODate } from "@/lib/syllabusDates";
 import { describeMeetingPattern } from "@/lib/syllabusCourseInfo";
-import { KIND_LABELS, type Confidence, type SyllabusParseResult } from "@/lib/syllabusParser";
+import {
+  KIND_LABELS,
+  summariseAssignments,
+  type Confidence,
+  type SyllabusParseResult,
+} from "@/lib/syllabusParser";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -307,6 +312,13 @@ function ReviewForm({
     return `Add ${parts.join(" and ")}`;
   })();
 
+  // What the checked rows amount to, so the shape of the import can be read
+  // without going down forty near-identical lines.
+  const shape = useMemo(
+    () => summariseAssignments(importable.map((row) => row.title)),
+    [importable],
+  );
+
   const orderedRows = useMemo(
     () => [...rows].sort((a, b) => (a.dueAt || "9999").localeCompare(b.dueAt || "9999")),
     [rows],
@@ -442,6 +454,19 @@ function ReviewForm({
               </Button>
             </div>
           </div>
+
+          {shape.length > 0 ? (
+            <p className="text-sm text-[var(--color-ink-muted)]">
+              That is{" "}
+              {shape
+                .map(
+                  (group) =>
+                    `${group.count} × ${group.label}${group.count > 1 && !/s$/i.test(group.label) ? "s" : ""}`,
+                )
+                .join(", ")}
+              .
+            </p>
+          ) : null}
 
           <ul className="space-y-2">
             {orderedRows.map((row) => (

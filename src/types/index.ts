@@ -120,6 +120,11 @@ export type TaskSource =
       kind: "lectures";
       /** Sunday of the week this covers, as a local day key. */
       weekStart: ISODateString;
+    }
+  | {
+      kind: "calendar";
+      /** The feed's own identifier, so a re-import updates rather than duplicates. */
+      uid: string;
     };
 
 export interface Task {

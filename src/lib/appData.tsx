@@ -167,9 +167,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       ) =>
         source?.kind === "lectures"
           ? `lectures|${task.courseId}|${source.weekStart}`
-          : `syllabus|${source?.kind === "syllabus" ? source.documentId : ""}|${task.title
-              .trim()
-              .toLowerCase()}|${task.dueAt ?? ""}`;
+          : source?.kind === "calendar"
+            ? // The feed's own id, which survives the assignment being renamed
+              // or its deadline moving.
+              `calendar|${source.uid}`
+            : `syllabus|${source?.kind === "syllabus" ? source.documentId : ""}|${task.title
+                .trim()
+                .toLowerCase()}|${task.dueAt ?? ""}`;
 
       const existing = new Set(
         dataRef.current.tasks

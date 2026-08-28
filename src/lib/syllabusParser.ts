@@ -314,6 +314,70 @@ function assignmentsFromSchedule(
   return found;
 }
 
+/**
+ * Tells apart rows a table worded identically every week.
+ *
+ * "Discussion: Participate in this Module's Discussion on CANVAS." is the
+ * same sentence in all fifteen rows of a real syllabus, so the list came back
+ * with fifteen indistinguishable lines. Where a title repeats, it is cut back
+ * to what it is and given the week it belongs to — which is the only thing
+ * that actually differs.
+ */
+function disambiguate(found: Omit<ParsedAssignment, "id">[]): Omit<ParsedAssignment, "id">[] {
+  const counts = new Map<string, number>();
+  for (const item of found) {
+    const key = item.title.toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return found.map((item) => {
+    if ((counts.get(item.title.toLowerCase()) ?? 0) < 2) return item;
+
+    // The head noun is the name; the rest was boilerplate repeated verbatim.
+    const head = DELIVERABLE_HEAD.exec(item.title)?.[0] ?? "";
+    const name = titleCase(head.replace(/[\s:#\-–—(]+$/, "").trim()) || item.title;
+    const when = item.dueAt
+      ? new Date(`${item.dueAt}T00:00:00`).toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+        })
+      : item.rawDate;
+    return { ...item, title: truncate(when ? `${name} — ${when}` : name) };
+  });
+}
+
+/** One kind of repeated work, and how many of it there are. */
+export interface AssignmentGroup {
+  label: string;
+  count: number;
+}
+
+/**
+ * What a list of assignments amounts to, in a line.
+ *
+ * A real term comes back as forty-odd rows of "Quiz 1", "Quiz 2", "Quiz 3" —
+ * and checking forty near-identical rows is exactly the reading this app
+ * exists to spare people. Saying "13 quizzes, 14 discussion boards" up front
+ * lets someone verify the shape of the import without scanning it.
+ */
+export function summariseAssignments(titles: string[]): AssignmentGroup[] {
+  const groups = new Map<string, AssignmentGroup>();
+
+  for (const title of titles) {
+    // What is left once the thing that only numbers it is gone.
+    const label =
+      title
+        .replace(/\s*[—–-]\s*\w{3,9}\.?\s*\d{1,2}$/, "")
+        .replace(/\s*#?\d+\s*$/, "")
+        .trim() || title;
+    const existing = groups.get(label.toLowerCase());
+    if (existing) existing.count += 1;
+    else groups.set(label.toLowerCase(), { label, count: 1 });
+  }
+
+  return [...groups.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
 function extractAssignments(paragraphs: string[], term: TermWindow): ParsedAssignment[] {
   const assignments: ParsedAssignment[] = [];
   const seen = new Set<string>();
@@ -370,7 +434,7 @@ function extractAssignments(paragraphs: string[], term: TermWindow): ParsedAssig
   // Added after the line-by-line pass, and skipped where it already found the
   // same thing: a line that carried its own date was read more precisely than
   // a row heading can be.
-  for (const row of assignmentsFromSchedule(paragraphs, term)) {
+  for (const row of disambiguate(assignmentsFromSchedule(paragraphs, term))) {
     const key = `${row.title.toLowerCase()}|${row.dueAt ?? row.rawDate}`;
     if (seen.has(key)) continue;
     seen.add(key);

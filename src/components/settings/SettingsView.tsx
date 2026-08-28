@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { backupIsOverdue, describeLastBackup, markBackedUp, useLastBackup } from "@/lib/backupReminder";
 import { useAppData } from "@/lib/appData";
 import {
   BackupError,
@@ -13,7 +14,7 @@ import {
   type MergeReport,
 } from "@/lib/backup";
 import { useStoragePersistence } from "@/lib/storagePersistence";
-import { createId } from "@/lib/utils";
+import { cn, createId } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { EMPTY_DATA } from "@/lib/storage";
@@ -52,6 +53,8 @@ export function SettingsView() {
     documents: data.documents.length,
   };
   const isEmpty = counts.courses + counts.tasks + counts.documents === 0;
+  const lastBackup = useLastBackup();
+  const overdue = backupIsOverdue(lastBackup, !isEmpty);
 
   function handleExport() {
     const blob = new Blob([JSON.stringify(createBackup(data), null, 2)], {
@@ -64,6 +67,7 @@ export function SettingsView() {
     link.click();
     // Revoked on the next tick so the download has taken the URL first.
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    markBackedUp();
     setNotice({ tone: "ok", text: `Saved ${backupFileName()} to your downloads.` });
   }
 
@@ -114,6 +118,22 @@ export function SettingsView() {
               ? `${counts.courses} ${counts.courses === 1 ? "course" : "courses"}, ${counts.tasks} ${counts.tasks === 1 ? "task" : "tasks"}, ${counts.documents} ${counts.documents === 1 ? "document" : "documents"} — about ${formatBytes(backupSize)}.`
               : "Loading…"}
           </p>
+
+          {ready && !isEmpty ? (
+            <p
+              className={cn(
+                "text-sm",
+                overdue
+                  ? "font-medium text-[#a8503f] dark:text-[#e29b8b]"
+                  : "text-[var(--color-ink-muted)]",
+              )}
+            >
+              {describeLastBackup(lastBackup)}.
+              {overdue
+                ? " This is the only copy — a cleared browser would take it all."
+                : ""}
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap gap-3">
             <Button variant="primary" onClick={handleExport} disabled={!ready || isEmpty}>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseSyllabus } from "../syllabusParser.ts";
+import { parseSyllabus, summariseAssignments } from "../syllabusParser.ts";
 
 const TERM = { termStart: "2026-08-24" };
 
@@ -384,4 +384,25 @@ test("does not file a class activity as something to hand in", () => {
     result.assignments.map((assignment) => assignment.title),
     ["Quiz 2"],
   );
+});
+
+test("summarises a term of repeated work in a line", () => {
+  const groups = summariseAssignments([
+    "Quiz 1",
+    "Quiz 2",
+    "Quiz 13",
+    "Discussion Board 1",
+    "Discussion Board 2",
+    "Discussion — Sep 14",
+    "Discussion — Oct 5",
+    "Midterm Exam",
+  ]);
+
+  // Ordered by how many there are, so the shape of the import reads first.
+  assert.deepEqual(groups, [
+    { label: "Quiz", count: 3 },
+    { label: "Discussion", count: 2 },
+    { label: "Discussion Board", count: 2 },
+    { label: "Midterm Exam", count: 1 },
+  ]);
 });

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppData } from "@/lib/appData";
+import { backupIsOverdue, useLastBackup } from "@/lib/backupReminder";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { cn } from "@/lib/utils";
 import { CourseIcon } from "@/components/courses/CourseIcon";
@@ -16,6 +17,11 @@ interface SidebarProps {
 export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const { data, ready } = useAppData();
+  const lastBackup = useLastBackup();
+  const overdue = backupIsOverdue(
+    lastBackup,
+    ready && data.courses.length + data.tasks.length > 0,
+  );
 
   // The sidebar shows a handful of courses at most. The full list lives on
   // /courses; a scrolling wall of classes in the chrome is the kind of
@@ -142,8 +148,13 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           Settings &amp; backup
         </Link>
 
+        {/* One line that changes its mind, rather than a badge that never
+            clears. A permanent red dot is exactly the background dread this
+            app exists to avoid. */}
         <p className="px-3 text-xs leading-relaxed text-[var(--color-ink-muted)]">
-          Everything is saved on this device. One small step is still a step.
+          {overdue
+            ? "This device holds the only copy of your term. Settings has a backup button."
+            : "Everything is saved on this device. One small step is still a step."}
         </p>
       </div>
     </nav>

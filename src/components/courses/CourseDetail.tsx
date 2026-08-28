@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { CalendarImport } from "@/components/courses/CalendarImport";
 import { LecturePlanner } from "@/components/courses/LecturePlanner";
 import { CourseIcon } from "@/components/courses/CourseIcon";
 import { CourseFormDialog } from "@/components/courses/CourseFormDialog";
@@ -148,6 +149,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
           <QuickAddTask defaultCourseId={courseId} />
         </Card>
       </section>
+
+      <CalendarImport course={course} />
 
       <LecturePlanner course={course} onEditCourse={() => setEditing(true)} />
 

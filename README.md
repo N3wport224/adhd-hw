@@ -69,7 +69,7 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 173 cases
+npm test           # node:test over the pure logic — 210 cases
 ```
 
 ## What it does
@@ -133,6 +133,16 @@ can be changed by hand. Assignments can be edited after the fact — title,
 course, due date and notes — and moving a due date offers to spread the
 remaining steps again, since the old days no longer fit.
 
+**Course calendar import** — Canvas, Blackboard and Moodle all publish an
+iCalendar file of every assignment and its real due date. Saving that file and
+dropping it on the course reads it directly: no heuristics, and re-importing
+after a deadline moves updates what is already there rather than duplicating
+it, because every item carries the feed's own identifier. A downloaded file
+rather than a subscribed URL — the feed address is a secret link to everything
+you are enrolled in, and nothing here needs to hold one. The syllabus scan
+still earns its place for what a feed does not carry: grading weights, office
+hours, class times.
+
 **Weekly lectures** — the one piece of coursework nothing writes down as a
 deadline, and so the first to quietly slide. Given a term and the days a class
 meets, each week of term becomes a single task ("Week 6 lectures") with a step
@@ -148,7 +158,9 @@ next step and a Pomodoro timer, and nothing else. Completed focus blocks are
 counted against the task.
 
 **Settings & backup** (`/settings`) — download everything as a JSON file and
-import it back. Importing adds to what is there and skips anything already
+import it back. The date of the last backup is kept per device, and after a
+fortnight the settings page and the sidebar say so in words — not a badge that
+never clears, which is the background dread this app exists to avoid. Importing adds to what is there and skips anything already
 present, so importing the same file twice is safe. Also asks the browser for
 durable storage, which is what stops it clearing your data to make room for
 other sites.
@@ -205,6 +217,9 @@ adhd-hw/
     │   ├── schedule.ts                 # calendar grids, local-day grouping
     │   ├── stepPlanner.ts              # spreading steps across the days left
     │   ├── lecturePlan.ts              # a term of weekly lecture tasks
+    │   ├── calendarFeed.ts             # iCalendar parsing for course feeds
+    │   ├── syllabusTables.ts           # flattened table rows, put back together
+    │   ├── backupReminder.ts           # when this device last backed up
     │   ├── useFocusTrap.ts             # focus handling shared by every overlay
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format
@@ -347,6 +362,8 @@ A few decisions worth knowing before extending this:
 
 ## Known limits
 
+- **A calendar feed is a snapshot, not a subscription.** Dropping the file in
+  again is what picks up a moved deadline; nothing polls for you.
 - **The syllabus parser is heuristics, not understanding.** It reads the
   common shapes — a dated line naming a deliverable, a label next to a
   percentage — and will miss anything laid out as a table of images, or
