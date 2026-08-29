@@ -31,12 +31,18 @@ no `.env` file — everything runs in the browser and stores its data there.
 3. **Schedule.** Your deadlines are now on a calendar, coloured by course. If
    the current week is empty it will point you at the next week that isn't.
 4. **Library → drop in a reading**, open it, and press play. Space plays and
-   pauses, arrows move a sentence, shift+arrows move a section.
+   pauses, arrows move a sentence, shift+arrows move a section. Hover a
+   sentence and press **K** to keep it, with a note if you want one.
 5. **Tasks → Break into steps** on something due next week, and let it spread
    the steps across the days. Then look at Focus and Schedule again — today
    now has one small piece of it, with a checkbox.
-6. **Focus → Start a focus session** for a Pomodoro timer on one task.
-7. **Settings → Download a backup** once you have anything worth keeping.
+6. **Focus → Just five minutes** (or **A full session**) for a timer on one
+   task. It opens armed and starts on the first thing you do, so go and find
+   the reading first — the clock waits.
+7. **Settings → Turn reminders on**, so something tells you it is time
+   instead of waiting to be opened. Your browser will ask permission.
+8. **Settings → Download a backup** once you have anything worth keeping.
+   This device holds the only copy.
 
 ### Accessibility
 
