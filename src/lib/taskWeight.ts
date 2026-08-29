@@ -1,6 +1,6 @@
 import { singular } from "@/lib/utils";
 import { effortLabel } from "@/lib/workHistory";
-import type { Course, Task } from "@/types";
+import type { Course, GradeWeight, Task } from "@/types";
 
 /**
  * What a piece of work is worth, from the grading breakdown the course
@@ -39,7 +39,7 @@ function words(text: string): Set<string> {
  * "Quiz 7" against "Quizzes", "Project Assignment 3" against "Project
  * Assignments". Deliberately conservative: no shared word, no claim.
  */
-export function gradeShareOf(task: Task, course: Course | null): number | null {
+export function categoryOf(task: Task, course: Course | null): GradeWeight | null {
   const weights = course?.gradingWeights ?? [];
   if (weights.length === 0) return null;
 
@@ -47,16 +47,20 @@ export function gradeShareOf(task: Task, course: Course | null): number | null {
   const taskWords = words(effortLabel(task.title));
   if (taskWords.size === 0) return null;
 
-  let best: { percent: number; overlap: number } | null = null;
+  let best: { weight: GradeWeight; overlap: number } | null = null;
   for (const weight of weights) {
     const categoryWords = words(weight.label);
     let overlap = 0;
     for (const word of taskWords) if (categoryWords.has(word)) overlap += 1;
     if (overlap === 0) continue;
-    if (!best || overlap > best.overlap) best = { percent: weight.percent, overlap };
+    if (!best || overlap > best.overlap) best = { weight, overlap };
   }
 
-  return best ? best.percent : null;
+  return best ? best.weight : null;
+}
+
+export function gradeShareOf(task: Task, course: Course | null): number | null {
+  return categoryOf(task, course)?.percent ?? null;
 }
 
 /**

@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { describeShare, taskShareOf } from "@/lib/taskWeight";
+import { categoryOf, describeShare, taskShareOf } from "@/lib/taskWeight";
 import { useAppData } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { cn, describeDueDate, daysUntil } from "@/lib/utils";
 import { Card } from "@/components/ui/Card";
 import { SubtaskList } from "@/components/tasks/SubtaskList";
+import { ScoreField } from "@/components/tasks/ScoreField";
+import { TaskReadings } from "@/components/tasks/TaskReadings";
+import { looksLikeAnExam } from "@/lib/examPlan";
 import type { Task } from "@/types";
 
 interface TaskCardProps {
@@ -16,6 +19,8 @@ interface TaskCardProps {
   onEdit?(task: Task): void;
   /** Open by default for the task the user is most likely acting on. */
   defaultExpanded?: boolean;
+  /** Absent where a revision plan has nowhere to open a dialog from. */
+  onPlanRevision?(task: Task): void;
 }
 
 export function TaskCard({
@@ -23,6 +28,7 @@ export function TaskCard({
   onBreakDown,
   onEdit,
   defaultExpanded = false,
+  onPlanRevision,
 }: TaskCardProps) {
   const { data, updateTask, removeTask } = useAppData();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -31,6 +37,16 @@ export function TaskCard({
 
   const course = data.courses.find((item) => item.id === task.courseId) ?? null;
   const share = describeShare(taskShareOf(task, course, data.tasks));
+  /*
+   * Offered unless we positively know this is not marked work.
+   *
+   * A weekly lectures task belongs to no grading category, so a score on it
+   * would count towards nothing — an input that quietly does nothing is worse
+   * than no input. Where the course has no breakdown at all, nothing can be
+   * ruled out, so the field stays: a mark is worth recording either way.
+   */
+  const gradeable =
+    (course?.gradingWeights ?? []).length === 0 || categoryOf(task, course) !== null;
   const done = task.status === "done";
   const overdue = !done && task.dueAt !== null && daysUntil(task.dueAt) < 0;
   const doneSteps = task.subtasks.filter((step) => step.done).length;
@@ -91,7 +107,9 @@ export function TaskCard({
               {task.notes}
             </p>
           ) : null}
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--color-ink-muted)]">
+          {/* A div, not a p: the score field this holds is a form, and a form
+              inside a paragraph is invalid HTML that fails hydration. */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--color-ink-muted)]">
             {course ? (
               <span
                 className={cn(
@@ -119,7 +137,10 @@ export function TaskCard({
             {/* Only where it is big enough to change what you drop on a bad
                 week. One percent of the grade is noise on a card. */}
             {share ? <span className="font-medium">{share}</span> : null}
-          </p>
+            {/* Only on finished work: a score field on something not handed in
+                yet is an empty box being a small reproach. */}
+            {done && gradeable ? <ScoreField task={task} /> : null}
+          </div>
         </div>
 
         {onEdit && !confirmingDelete ? (
@@ -214,6 +235,23 @@ export function TaskCard({
             </button>
           </>
         )}
+
+        {/* An exam is the one deadline where nothing is handed in, so nothing
+            forces the work to happen early and all of it lands the night
+            before. Offered only while there are still days to use. */}
+        {!done && looksLikeAnExam(task) && onPlanRevision ? (
+          <button
+            type="button"
+            onClick={() => onPlanRevision(task)}
+            className="min-h-9 rounded-lg bg-[var(--color-accent-wash)] px-3 text-sm font-medium text-[var(--color-accent)] transition hover:brightness-95"
+          >
+            Plan the run-up
+          </button>
+        ) : null}
+      </div>
+
+      <div className="pl-11">
+        <TaskReadings task={task} />
       </div>
 
       {expanded && task.subtasks.length > 0 ? (

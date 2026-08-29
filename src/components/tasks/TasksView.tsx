@@ -10,6 +10,7 @@ import { controlClass } from "@/components/ui/Field";
 import { QuickAddTask } from "@/components/focus/QuickAddTask";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
+import { RevisionDialog } from "@/components/tasks/RevisionDialog";
 import { EditTaskDialog } from "@/components/tasks/EditTaskDialog";
 import type { Task } from "@/types";
 
@@ -46,6 +47,7 @@ export function TasksView() {
   const [courseFilter, setCourseFilter] = useState("all");
   const [showDone, setShowDone] = useState(false);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
+  const [revisionTask, setRevisionTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [collapsed, setCollapsed] = useState<Bucket[]>(COLLAPSED_BY_DEFAULT);
 
@@ -192,6 +194,7 @@ export function TasksView() {
                     <TaskCard
                       task={task}
                       onBreakDown={setBreakdownTask}
+                      onPlanRevision={setRevisionTask}
                 onEdit={setEditingTask}
                       defaultExpanded={position === 0 && bucket !== "later" && bucket !== "someday"}
                     />
@@ -209,7 +212,7 @@ export function TasksView() {
           <ul className="space-y-3">
             {doneTasks.map((task) => (
               <li key={task.id}>
-                <TaskCard task={task} onBreakDown={setBreakdownTask}
+                <TaskCard task={task} onBreakDown={setBreakdownTask} onPlanRevision={setRevisionTask}
                 onEdit={setEditingTask} />
               </li>
             ))}
@@ -228,6 +231,12 @@ export function TasksView() {
         open={editingTask !== null}
         task={editingTask}
         onClose={() => setEditingTask(null)}
+      />
+
+      <RevisionDialog
+        open={revisionTask !== null}
+        task={revisionTask}
+        onClose={() => setRevisionTask(null)}
       />
 
       <BreakdownDialog

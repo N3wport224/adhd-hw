@@ -20,6 +20,7 @@ import { EditTaskDialog } from "@/components/tasks/EditTaskDialog";
 import { DocumentDropzone } from "@/components/documents/DocumentDropzone";
 import { DocumentRow } from "@/components/documents/DocumentRow";
 import { GradingBreakdown } from "@/components/courses/GradingBreakdown";
+import { CourseStanding } from "@/components/courses/CourseStanding";
 import { describeMeetingPattern } from "@/lib/syllabusCourseInfo";
 import {
   SyllabusScanner,
@@ -207,6 +208,8 @@ export function CourseDetail({ courseId }: { courseId: string }) {
           </Card>
         ) : null}
       </section>
+
+      <CourseStanding course={course} />
 
       {course.gradingWeights && course.gradingWeights.length > 0 ? (
         <section className="space-y-4">

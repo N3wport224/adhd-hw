@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAppData } from "@/lib/appData";
 import { describeHours, weekDone, weekLoad } from "@/lib/weekLoad";
+import { TIME_WINDOWS, describeStepMinutes, stepMinutes, stepsThatFit, type TimeWindow } from "@/lib/timeAvailable";
 import { DEFAULT_FOCUS_MINUTES, type FocusMinutes } from "@/lib/pomodoro";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { COURSE_COLORS } from "@/lib/courseStyles";
@@ -14,8 +15,8 @@ import { QuickAddTask } from "@/components/focus/QuickAddTask";
 import { FocusMode } from "@/components/focus/FocusMode";
 import { BreakdownDialog } from "@/components/tasks/BreakdownDialog";
 import { daysUntil } from "@/lib/utils";
-import { dayKeyOf, overdueSteps, stepsOnDay, toDayKey } from "@/lib/schedule";
-import { describePlan, planStepDays, replanOpenSteps } from "@/lib/stepPlanner";
+import { overdueSteps, stepsOnDay, toDayKey } from "@/lib/schedule";
+import { catchUpPlan, describeCatchUp } from "@/lib/catchUp";
 import { cn } from "@/lib/utils";
 import type { Task } from "@/types";
 
@@ -25,60 +26,74 @@ import type { Task } from "@/types";
  * Falling behind is the ordinary case for this audience, and a plan still
  * pointing at days that have gone stops being a plan and becomes a list of
  * failures to scroll past. One button re-spreads whatever is left over the
- * days that actually remain.
+ * days that actually remain — around the class nights, which the old version
+ * of this happily planned straight through.
+ *
+ * The size is shown before anything moves. A number you can look at is
+ * smaller than a pile you are avoiding, and it is nearly always smaller than
+ * the guess.
  */
-function CatchUp({
-  taskIds,
-  count,
-  onDone,
-}: {
-  taskIds: string[];
-  count: number;
-  onDone(): void;
-}) {
+function CatchUp({ onDone }: { onDone(): void }) {
   const { data, setSubtasks } = useAppData();
+  const [confirming, setConfirming] = useState(false);
   const today = toDayKey(new Date());
 
-  const tasks = data.tasks.filter((task) => taskIds.includes(task.id));
-  const openCount = tasks.reduce(
-    (total, task) => total + task.subtasks.filter((step) => !step.done).length,
-    0,
-  );
-  const preview = planStepDays(openCount, {
-    from: today,
-    due: null,
-    perDay: 2,
-  });
-
-  function catchUp() {
-    for (const task of tasks) {
-      setSubtasks(
-        task.id,
-        replanOpenSteps(task.subtasks, {
-          from: today,
-          due: task.dueAt ? dayKeyOf(task.dueAt) : null,
-          perDay: 2,
-        }),
-      );
-    }
-    onDone();
-  }
+  const plan = catchUpPlan(data.tasks, data.courses, today);
+  if (plan.stepCount === 0) return null;
 
   return (
-    <div className="space-y-2 rounded-xl bg-[var(--color-surface)] p-4">
+    <div className="space-y-3 rounded-xl bg-[var(--color-surface)] p-4">
       <p className="text-sm">
-        <span className="font-medium">
-          {count} {count === 1 ? "step" : "steps"} slipped past {count === 1 ? "its" : "their"} day.
-        </span>{" "}
+        <span className="font-medium">{describeCatchUp(plan)}</span>{" "}
         <span className="text-[var(--color-ink-muted)]">
-          That happens. Move what is left onto the days you still have.
+          That happens. Moving them deletes nothing — it stops the plan pointing at
+          days that have already gone.
         </span>
       </p>
-      <Button variant="secondary" onClick={catchUp}>
-        Re-spread from today
-      </Button>
+
+      {confirming ? (
+        <>
+          <ul className="space-y-1 text-sm">
+            {plan.tasks.slice(0, 6).map((entry) => (
+              <li key={entry.task.id} className="flex flex-wrap justify-between gap-x-3">
+                <span>{entry.task.title}</span>
+                <span className="text-[var(--color-ink-muted)]">
+                  {entry.slipped.length} {entry.slipped.length === 1 ? "step" : "steps"}
+                  {entry.overdue ? " · already past its date" : ""}
+                </span>
+              </li>
+            ))}
+            {plan.tasks.length > 6 ? (
+              <li className="text-[var(--color-ink-muted)]">
+                and {plan.tasks.length - 6} more.
+              </li>
+            ) : null}
+          </ul>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              onClick={() => {
+                for (const entry of plan.tasks) setSubtasks(entry.task.id, entry.subtasks);
+                setConfirming(false);
+                onDone();
+              }}
+            >
+              Move them forward
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              Leave them
+            </Button>
+          </div>
+        </>
+      ) : (
+        <Button variant="secondary" onClick={() => setConfirming(true)}>
+          Re-spread from today
+        </Button>
+      )}
+
       <p className="text-xs text-[var(--color-ink-muted)]">
-        {describePlan(preview)} Anything already finished keeps the day it was done.
+        Class nights are kept clear where there is room, and anything already
+        finished keeps the day it was done.
       </p>
     </div>
   );
@@ -88,9 +103,12 @@ function CatchUp({
 function PlannedStepRow({
   entry,
   today,
+  minutes,
 }: {
   entry: { task: Task; step: Task["subtasks"][number] };
   today: string;
+  /** What this is expected to cost, so a window can be judged by eye too. */
+  minutes?: number;
 }) {
   const { data, toggleSubtask, setSubtaskDay } = useAppData();
   const [justCompleted, setJustCompleted] = useState(false);
@@ -155,6 +173,11 @@ function PlannedStepRow({
             </span>
           ) : null}
           <span className="truncate">{entry.task.title}</span>
+          {/* Shown next to the filter so the window can be judged by eye as
+              well as trusted. */}
+          {minutes !== undefined && !done ? (
+            <span className="tabular-nums">{describeStepMinutes(minutes)}</span>
+          ) : null}
           {late ? (
             <span className="text-[#a8503f] dark:text-[#e29b8b]">carried over</span>
           ) : null}
@@ -208,9 +231,16 @@ export function FocusView() {
   // ask is one nobody argues with.
   const [startMinutes, setStartMinutes] = useState<FocusMinutes>(DEFAULT_FOCUS_MINUTES);
   const [caughtUp, setCaughtUp] = useState(false);
+  // Null is "everything", which is the honest default: a filter that starts
+  // switched on hides work without being asked to. Not named `window` —
+  // that is the global this file already calls setTimeout on.
+  const [haveMinutes, setHaveMinutes] = useState<TimeWindow | null>(null);
   const [breakdownTask, setBreakdownTask] = useState<Task | null>(null);
 
-  const load = useMemo(() => weekLoad(data.tasks), [data.tasks]);
+  const load = useMemo(
+    () => weekLoad(data.tasks, new Date(), data.courses),
+    [data.tasks, data.courses],
+  );
   const done = useMemo(() => weekDone(data.tasks), [data.tasks]);
 
   const { nextUp, dueToday, laterCount, doneToday } = useMemo(() => {
@@ -252,11 +282,18 @@ export function FocusView() {
   const openToday = todaysSteps.filter((entry) => !entry.step.done);
   const doneTodayCount = todaysSteps.length - openToday.length;
 
-  // Tasks with steps that were meant to happen before today and did not.
-  const slippedTaskIds = useMemo(
-    () => [...new Set(overdueSteps(data.tasks, today).map((entry) => entry.task.id))],
-    [data.tasks, today],
+  // Filtering applies to what is still open. A finished step disappearing
+  // because it would not have fitted the window is nonsense — it already
+  // happened.
+  const shownSteps = useMemo(
+    () =>
+      todaysSteps.filter(
+        (entry) => entry.step.done || stepsThatFit([entry], haveMinutes, data.tasks).length > 0,
+      ),
+    [todaysSteps, haveMinutes, data.tasks],
   );
+  const hiddenByWindow = todaysSteps.length - shownSteps.length;
+
   const slippedCount = overdueSteps(data.tasks, today).length;
 
   const nextStep = nextUp?.subtasks.find((step) => !step.done) ?? null;
@@ -321,13 +358,72 @@ export function FocusView() {
                   </p>
                 </div>
 
+                {/* "I have twenty minutes" was a question this screen could not
+                    answer: the day's list was all or nothing, whether you had
+                    the evening or the gap before a lecture. Twenty free minutes
+                    spent reading a list of two-hour jobs is twenty minutes
+                    spent deciding not to start. */}
+                {openToday.length > 1 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span id="have-label" className="text-sm text-[var(--color-ink-muted)]">
+                      I have
+                    </span>
+                    <div
+                      role="radiogroup"
+                      aria-labelledby="have-label"
+                      className="flex flex-wrap gap-1"
+                    >
+                      {[null, ...TIME_WINDOWS].map((minutes) => {
+                        const selected = haveMinutes === minutes;
+                        return (
+                          <button
+                            key={minutes ?? "all"}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            tabIndex={selected ? 0 : -1}
+                            onClick={() => setHaveMinutes(minutes)}
+                            className={cn(
+                              "min-h-9 rounded-lg px-3 text-sm font-medium transition",
+                              selected
+                                ? "bg-[var(--color-accent)] text-[var(--color-on-accent)]"
+                                : "text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]",
+                            )}
+                          >
+                            {minutes === null ? "all evening" : `${minutes} min`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+
                 <ul className="space-y-1">
-                  {todaysSteps.map((entry) => (
+                  {shownSteps.map((entry) => (
                     <li key={entry.step.id}>
-                      <PlannedStepRow entry={entry} today={today} />
+                      <PlannedStepRow
+                        entry={entry}
+                        today={today}
+                        minutes={stepMinutes(entry, data.tasks)}
+                      />
                     </li>
                   ))}
                 </ul>
+
+                {hiddenByWindow > 0 ? (
+                  <p className="text-sm text-[var(--color-ink-muted)]">
+                    {hiddenByWindow} {hiddenByWindow === 1 ? "step needs" : "steps need"}{" "}
+                    longer than that. They are still there —{" "}
+                    <button
+                      type="button"
+                      onClick={() => setHaveMinutes(null)}
+                      className="underline underline-offset-4"
+                    >
+                      show the whole day
+                    </button>
+                    .
+                  </p>
+                ) : null}
 
                 {carriedHidden > 0 ? (
                   <p className="text-sm text-[var(--color-ink-muted)]">
@@ -345,11 +441,7 @@ export function FocusView() {
                     owned by the prompt would unmount at the exact moment it
                     had something to say. */}
                 {slippedCount > 0 ? (
-                  <CatchUp
-                    taskIds={slippedTaskIds}
-                    count={slippedCount}
-                    onDone={() => setCaughtUp(true)}
-                  />
+                  <CatchUp onDone={() => setCaughtUp(true)} />
                 ) : caughtUp ? (
                   <p
                     role="status"

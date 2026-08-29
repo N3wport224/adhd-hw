@@ -3,11 +3,14 @@ import "./globals.css";
 import { AppDataProvider } from "@/lib/appData";
 import { ThemeProvider, themeInitScript } from "@/lib/theme";
 import { AppShell } from "@/components/layout/AppShell";
+import { ServiceWorker } from "@/components/layout/ServiceWorker";
 
 export const metadata: Metadata = {
   title: "Steady — study companion",
   description:
     "A calm study and course companion for college students with ADHD: one next step at a time, with read-aloud support.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "Steady", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -25,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
+        <ServiceWorker />
         <ThemeProvider>
           <AppDataProvider>
             <AppShell>{children}</AppShell>

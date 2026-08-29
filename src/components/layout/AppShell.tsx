@@ -7,6 +7,8 @@ import { TopBar } from "@/components/layout/TopBar";
 import { MobileNavDrawer } from "@/components/layout/MobileNavDrawer";
 import { SaveErrorBanner } from "@/components/layout/SaveErrorBanner";
 import { ReminderWatch } from "@/components/layout/ReminderWatch";
+import { UndoBanner } from "@/components/layout/UndoBanner";
+import { CommandPalette } from "@/components/layout/CommandPalette";
 
 /**
  * The persistent frame every screen renders inside: a fixed sidebar on large
@@ -33,6 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[17rem_1fr]">
       <ReminderWatch />
+      <CommandPalette />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-[var(--color-surface)] focus:px-4 focus:py-3 focus:shadow-lg"
@@ -51,6 +54,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="flex min-w-0 flex-col">
         <TopBar onOpenMenu={() => setMenuOpen(true)} />
         <SaveErrorBanner />
+        <UndoBanner />
         <main
           id="main-content"
           tabIndex={-1}

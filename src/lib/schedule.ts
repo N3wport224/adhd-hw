@@ -167,6 +167,32 @@ export interface Meeting {
 const DEFAULT_TERM_MONTHS = 4;
 
 /**
+ * The days between two dates on which you are in a class.
+ *
+ * Both the planner and the week-load warning treat an evening as free time,
+ * which for someone with two classes running 5:15 to 8:00 is wrong twice a
+ * week. An evening already spent is not somewhere to put work.
+ */
+export function classDaysBetween(
+  courses: Course[],
+  from: string,
+  to: string,
+): Set<string> {
+  const days = new Set<string>();
+  if (courses.length === 0 || to < from) return days;
+
+  let cursor = new Date(`${from}T00:00:00`);
+  // A term is not a decade; the bound stops a mistyped date walking for ever.
+  for (let guard = 0; guard < 400; guard += 1) {
+    const day = toDayKey(cursor);
+    if (day > to) break;
+    if (meetingsOnDay(courses, day).length > 0) days.add(day);
+    cursor = addDays(cursor, 1);
+  }
+  return days;
+}
+
+/**
  * The span a course's weekly rules apply over.
  *
  * A term start with no end is common — syllabi say when a course begins far

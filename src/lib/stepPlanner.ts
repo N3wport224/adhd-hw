@@ -19,6 +19,15 @@ export interface PlanOptions {
   perDay: number;
   /** Leave Saturdays and Sundays clear. */
   skipWeekends?: boolean;
+  /**
+   * Days with no room in them — class nights, normally.
+   *
+   * Honoured only while there is somewhere else to put the work. A deadline
+   * that leaves nothing but class nights gets them: a plan that lands on a
+   * bad evening is still better than no plan, and pretending the day does not
+   * exist would silently drop steps.
+   */
+  busy?: string[];
 }
 
 export interface PlanSummary {
@@ -40,7 +49,13 @@ function isWeekend(day: string) {
 }
 
 /** Every candidate working day from `from` to `due`, inclusive. */
-function workingDays(from: string, due: string | null, needed: number, skipWeekends: boolean) {
+function workingDays(
+  from: string,
+  due: string | null,
+  needed: number,
+  skipWeekends: boolean,
+  busy: Set<string>,
+) {
   const days: string[] = [];
   const start = new Date(`${from}T00:00:00`);
 
@@ -63,6 +78,14 @@ function workingDays(from: string, due: string | null, needed: number, skipWeeke
     }
   }
 
+  // Class nights come out last, and only if enough of the window survives
+  // without them. Dropping them first would let a tight deadline end up with
+  // one day and four steps on it.
+  if (busy.size > 0) {
+    const free = days.filter((day) => !busy.has(day));
+    if (free.length >= Math.min(needed, days.length)) return free;
+  }
+
   return days;
 }
 
@@ -81,7 +104,13 @@ export function planStepDays(count: number, options: PlanOptions): PlanSummary {
 
   const perDay = Math.max(1, Math.floor(options.perDay));
   const needed = Math.ceil(count / perDay);
-  const available = workingDays(options.from, options.due, needed, options.skipWeekends ?? false);
+  const available = workingDays(
+    options.from,
+    options.due,
+    needed,
+    options.skipWeekends ?? false,
+    new Set(options.busy ?? []),
+  );
 
   // Use only as many days as the requested pace calls for, so "two a day"
   // does not become "one every third day" just because the deadline is far

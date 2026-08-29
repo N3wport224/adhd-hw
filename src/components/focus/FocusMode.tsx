@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useAppData } from "@/lib/appData";
 import { COURSE_COLORS } from "@/lib/courseStyles";
 import { useFocusTrap } from "@/lib/useFocusTrap";
@@ -30,6 +31,13 @@ interface FocusModeProps {
 export function FocusMode({ task, onExit, startMinutes, autoStart }: FocusModeProps) {
   const { data, addTask, updateTask, toggleSubtask } = useAppData();
   const course = data.courses.find((item) => item.id === task.courseId) ?? null;
+  // The readings this task actually needs, reachable without leaving. Getting
+  // up to go and find the chapter is where a started session ends.
+  // Not named `document`: this file's key handler talks to the global one,
+  // and shadowing it here is a trap for whoever edits this next.
+  const readings = (task.documentIds ?? [])
+    .map((id) => data.documents.find((reading) => reading.id === id))
+    .filter((reading) => reading !== undefined);
   const nextStep = task.subtasks.find((step) => !step.done) ?? null;
   const doneSteps = task.subtasks.filter((step) => step.done).length;
 
@@ -54,7 +62,10 @@ export function FocusMode({ task, onExit, startMinutes, autoStart }: FocusModePr
       return;
     }
     onExit();
-  }, [onExit, capturingRef]);
+    // setCapturing is listed because the compiler infers it and refuses to
+    // optimise the component otherwise. A setter is stable, so it changes
+    // nothing at runtime.
+  }, [onExit, capturingRef, setCapturing]);
 
   // The same trap the dialogs use: Tab stays inside, and focus goes back to
   // whatever opened the session rather than being dropped on the page.
@@ -112,6 +123,20 @@ export function FocusMode({ task, onExit, startMinutes, autoStart }: FocusModePr
                 {doneSteps} of {task.subtasks.length} steps done
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {readings.length > 0 ? (
+          <div className="flex flex-wrap justify-center gap-2">
+            {readings.map((reading) => (
+              <Link
+                key={reading.id}
+                href={`/reader/${reading.id}`}
+                className="min-h-9 rounded-lg bg-[var(--color-surface-muted)] px-3 py-1.5 text-sm transition hover:brightness-95"
+              >
+                Open {reading.title}
+              </Link>
+            ))}
           </div>
         ) : null}
 

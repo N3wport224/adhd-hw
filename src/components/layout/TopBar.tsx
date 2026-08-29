@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { EXTRA_SECTIONS, NAV_ITEMS, isActivePath } from "@/components/layout/navigation";
+import { openPalette } from "@/lib/palette";
 
 interface TopBarProps {
   onOpenMenu(): void;
@@ -51,6 +52,47 @@ export function TopBar({ onOpenMenu }: TopBarProps) {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* The shortcuts are the fast path; these are how anyone learns the
+              shortcuts exist. Both say their key out loud in the tooltip. */}
+          <Button
+            variant="ghost"
+            onClick={() => openPalette("search")}
+            aria-label="Search everything"
+            title="Search everything (Ctrl or ⌘ + K)"
+            className="size-11 px-0"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              aria-hidden="true"
+              className="size-5"
+            >
+              <path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14Zm5 12 4 4" />
+            </svg>
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => openPalette("capture")}
+            aria-label="Park a thought"
+            title="Park a thought (C)"
+            className="size-11 px-0"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="size-5"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </Button>
           <ThemeToggle />
         </div>
       </div>

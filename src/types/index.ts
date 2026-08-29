@@ -158,8 +158,30 @@ export interface Task {
   resumeNote?: string;
   /** Absent for tasks the student typed in themselves. */
   source?: TaskSource;
+  /**
+   * What it came back marked.
+   *
+   * Kept as the two numbers rather than a percentage because that is what a
+   * marked paper says, and because "17 out of 20" survives a rubric changing
+   * its total in a way "85%" does not.
+   */
+  score?: TaskScore | null;
+  /**
+   * Readings this task actually needs, by document id.
+   *
+   * A task and the chapter it is about were strangers: finding the reading
+   * meant leaving the task, going to the library, and remembering what you
+   * were doing. Every navigation step is somewhere to fall off.
+   */
+  documentIds?: string[];
   createdAt: ISODateString;
   updatedAt: ISODateString;
+}
+
+/** A mark, as the marked thing states it. */
+export interface TaskScore {
+  earned: number;
+  outOf: number;
 }
 
 export type TaskDraft = Omit<

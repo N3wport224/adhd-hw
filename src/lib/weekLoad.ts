@@ -1,6 +1,6 @@
-import { addDays, startOfWeek, stepsOnDay, toDayKey } from "@/lib/schedule";
+import { addDays, classDaysBetween, startOfWeek, stepsOnDay, toDayKey } from "@/lib/schedule";
 import { typicalEfforts, effortLabel } from "@/lib/workHistory";
-import type { Task } from "@/types";
+import type { Course, Task } from "@/types";
 
 /**
  * What the week ahead actually asks of you, and what last week gave back.
@@ -27,6 +27,14 @@ export interface WeekLoad {
   minutes: number;
   /** Days left in the week, today included. */
   daysLeft: number;
+  /**
+   * Days left that are not already spent in a class.
+   *
+   * Two evening classes take a third of the week's usable evenings, and a
+   * capacity check that counts them as free is wrong in the direction that
+   * lets a bad week arrive unannounced.
+   */
+  eveningsLeft: number;
   /** True when the plan needs more of each remaining day than an evening holds. */
   crowded: boolean;
   /** How much of the estimate came from something actually measured. */
@@ -37,7 +45,7 @@ export interface WeekLoad {
  * The work planned between today and Saturday, priced from your own history
  * where there is any and from a modest guess where there is not.
  */
-export function weekLoad(tasks: Task[], today = new Date()): WeekLoad {
+export function weekLoad(tasks: Task[], today = new Date(), courses: Course[] = []): WeekLoad {
   const efforts = typicalEfforts(tasks);
   const todayKey = toDayKey(today);
   const endOfWeek = toDayKey(addDays(startOfWeek(today), 6));
@@ -67,10 +75,16 @@ export function weekLoad(tasks: Task[], today = new Date()): WeekLoad {
     ) + 1,
   );
 
+  const inClass = classDaysBetween(courses, todayKey, endOfWeek);
+  // Never zero: a week that is entirely class nights still has some room in
+  // it, and dividing by zero would report every week as a crisis.
+  const eveningsLeft = Math.max(1, daysLeft - inClass.size);
+
   return {
     steps,
     minutes,
     daysLeft,
+    eveningsLeft,
     measured,
     // Only worth saying out loud when most of the estimate is measured rather
     // than assumed. Priced at half an hour a step, a week of short discussion
@@ -79,7 +93,7 @@ export function weekLoad(tasks: Task[], today = new Date()): WeekLoad {
     crowded:
       steps > 0 &&
       measured / steps >= MOSTLY_MEASURED &&
-      minutes > daysLeft * EVENING_HOURS * 60,
+      minutes > eveningsLeft * EVENING_HOURS * 60,
   };
 }
 

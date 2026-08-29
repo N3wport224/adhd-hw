@@ -54,6 +54,15 @@ interface AppDataValue {
   saveError: string | null;
   /** Wholesale replacement, for importing a backup or starting over. */
   replaceAll(data: AppData): void;
+  /**
+   * The one destructive thing just done, if it can still be taken back.
+   *
+   * One step, not a stack. "How far back am I?" is its own load, and the
+   * mistake you want to undo is almost always the last thing you did.
+   */
+  undoable: { label: string } | null;
+  undo(): void;
+  dismissUndo(): void;
 }
 
 /**
@@ -78,8 +87,42 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<AppData>(EMPTY_DATA);
   const [ready, setReady] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [undoable, setUndoable] = useState<{ label: string; data: AppData } | null>(null);
   // Lets callbacks read the newest data without becoming dependencies of it.
   const dataRef = useLatestRef(data);
+  const undoRef = useLatestRef(undoable);
+
+  /**
+   * Every change to the store goes through here.
+   *
+   * Anything that declares a label can be taken back; anything that does not
+   * clears whatever was outstanding. That second half is the safety: undo can
+   * only ever restore the state from immediately before the last destructive
+   * action, so an offer left on screen for ten minutes cannot swallow ten
+   * minutes of work when it is finally clicked. Since nothing can have
+   * changed while the offer stands, it needs no timeout either — and an undo
+   * that expires in five seconds is no use to someone who notices the mistake
+   * in twenty.
+   *
+   * The snapshot is a reference, not a copy. AppData is only ever replaced,
+   * never edited in place, so holding the previous one costs nothing.
+   */
+  const mutate = useCallback(
+    (updater: (prev: AppData) => AppData, undoLabel?: string) => {
+      setUndoable(undoLabel ? { label: undoLabel, data: dataRef.current } : null);
+      setData(updater);
+    },
+    [dataRef],
+  );
+
+  const undo = useCallback(() => {
+    const snapshot = undoRef.current;
+    if (!snapshot) return;
+    setData(snapshot.data);
+    setUndoable(null);
+  }, [undoRef]);
+
+  const dismissUndo = useCallback(() => setUndoable(null), []);
   // Guards the save effect so the first render never writes EMPTY_DATA over
   // whatever is already in storage.
   const loaded = useRef(false);
@@ -95,6 +138,8 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
+    // Mount only. This is the one write that must not go through mutate — it
+    // is storage arriving, not the student changing anything.
   }, []);
 
   useEffect(() => {
@@ -123,12 +168,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const addCourse = useCallback((draft: CourseDraft) => {
     const now = new Date().toISOString();
     const course: Course = { ...draft, id: createId(), createdAt: now, updatedAt: now };
-    setData((prev) => ({ ...prev, courses: [...prev.courses, course] }));
+    mutate((prev) => ({ ...prev, courses: [...prev.courses, course] }));
     return course;
-  }, []);
+  }, [mutate]);
 
   const updateCourse = useCallback((id: string, patch: Partial<CourseDraft>) => {
-    setData((prev) => ({
+    mutate((prev) => ({
       ...prev,
       courses: prev.courses.map((course) =>
         course.id === id
@@ -136,21 +181,28 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           : course,
       ),
     }));
-  }, []);
+  }, [mutate]);
 
-  const removeCourse = useCallback((id: string) => {
-    // Tasks and documents outlive their course — they are unfiled, not deleted,
-    // so a mistaken course delete never destroys someone's work.
-    setData((prev) => ({
-      courses: prev.courses.filter((course) => course.id !== id),
-      tasks: prev.tasks.map((task) =>
-        task.courseId === id ? { ...task, courseId: null } : task,
-      ),
-      documents: prev.documents.map((doc) =>
-        doc.courseId === id ? { ...doc, courseId: null } : doc,
-      ),
-    }));
-  }, []);
+  const removeCourse = useCallback(
+    (id: string) => {
+      const name = dataRef.current.courses.find((course) => course.id === id)?.name;
+      // Tasks and documents outlive their course — they are unfiled, not deleted,
+      // so a mistaken course delete never destroys someone's work.
+      mutate(
+        (prev) => ({
+          courses: prev.courses.filter((course) => course.id !== id),
+          tasks: prev.tasks.map((task) =>
+            task.courseId === id ? { ...task, courseId: null } : task,
+          ),
+          documents: prev.documents.map((doc) =>
+            doc.courseId === id ? { ...doc, courseId: null } : doc,
+          ),
+        }),
+        name ? `Deleted ${name}` : "Deleted a course",
+      );
+    },
+    [mutate, dataRef],
+  );
 
   const addTask = useCallback((draft: TaskDraft) => {
     const now = new Date().toISOString();
@@ -161,9 +213,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       createdAt: now,
       updatedAt: now,
     };
-    setData((prev) => ({ ...prev, tasks: [...prev.tasks, task] }));
+    mutate((prev) => ({ ...prev, tasks: [...prev.tasks, task] }));
     return task;
-  }, []);
+  }, [mutate]);
 
   const importTasks = useCallback(
     (drafts: TaskDraft[]) => {
@@ -253,16 +305,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (fresh.length > 0) {
-        setData((prev) => ({ ...prev, tasks: [...prev.tasks, ...fresh] }));
+        mutate((prev) => ({ ...prev, tasks: [...prev.tasks, ...fresh] }));
       }
       return { added: fresh.length, skipped };
     },
-    [dataRef],
+    [mutate, dataRef],
   );
 
   const updateTask = useCallback(
     (id: string, patch: Partial<Omit<Task, "id" | "createdAt">>) => {
-      setData((prev) => ({
+      mutate((prev) => ({
         ...prev,
         tasks: prev.tasks.map((task) => {
           if (task.id !== id) return task;
@@ -276,15 +328,22 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         }),
       }));
     },
-    [],
+    [mutate],
   );
 
-  const removeTask = useCallback((id: string) => {
-    setData((prev) => ({ ...prev, tasks: prev.tasks.filter((task) => task.id !== id) }));
-  }, []);
+  const removeTask = useCallback(
+    (id: string) => {
+      const title = dataRef.current.tasks.find((task) => task.id === id)?.title;
+      mutate(
+        (prev) => ({ ...prev, tasks: prev.tasks.filter((task) => task.id !== id) }),
+        title ? `Deleted “${title}”` : "Deleted a task",
+      );
+    },
+    [mutate, dataRef],
+  );
 
   const setSubtasks = useCallback((taskId: string, subtasks: SubTask[]) => {
-    setData((prev) => ({
+    mutate((prev) => ({
       ...prev,
       tasks: prev.tasks.map((task) =>
         task.id === taskId
@@ -292,11 +351,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
           : task,
       ),
     }));
-  }, []);
+  }, [mutate]);
 
   const setSubtaskDay = useCallback(
     (taskId: string, subtaskId: string, plannedFor: string | null) => {
-      setData((prev) => ({
+      mutate((prev) => ({
         ...prev,
         tasks: prev.tasks.map((task) =>
           task.id === taskId
@@ -311,11 +370,11 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
     },
-    [],
+    [mutate],
   );
 
   const toggleSubtask = useCallback((taskId: string, subtaskId: string) => {
-    setData((prev) => ({
+    mutate((prev) => ({
       ...prev,
       tasks: prev.tasks.map((task) => {
         if (task.id !== taskId) return task;
@@ -341,7 +400,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         };
       }),
     }));
-  }, []);
+  }, [mutate]);
 
   const addDocument = useCallback((draft: StudyDocumentDraft) => {
     const now = new Date().toISOString();
@@ -352,13 +411,13 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       createdAt: now,
       updatedAt: now,
     };
-    setData((prev) => ({ ...prev, documents: [...prev.documents, document] }));
+    mutate((prev) => ({ ...prev, documents: [...prev.documents, document] }));
     return document;
-  }, []);
+  }, [mutate]);
 
   const updateDocument = useCallback(
     (id: string, patch: Partial<Omit<StudyDocument, "id" | "createdAt">>) => {
-      setData((prev) => ({
+      mutate((prev) => ({
         ...prev,
         documents: prev.documents.map((document) =>
           document.id === id
@@ -367,17 +426,40 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         ),
       }));
     },
-    [],
+    [mutate],
   );
 
-  const removeDocument = useCallback((id: string) => {
-    setData((prev) => ({
-      ...prev,
-      documents: prev.documents.filter((document) => document.id !== id),
-    }));
-  }, []);
+  const removeDocument = useCallback(
+    (id: string) => {
+      const title = dataRef.current.documents.find((document) => document.id === id)?.title;
+      mutate(
+        (prev) => ({
+          ...prev,
+          documents: prev.documents.filter((document) => document.id !== id),
+        }),
+        title ? `Removed “${title}”` : "Removed a document",
+      );
+    },
+    [mutate, dataRef],
+  );
 
-  const replaceAll = useCallback((next: AppData) => setData(next), []);
+  /**
+   * Wholesale replacement — a backup import, or starting over.
+   *
+   * The most destructive thing the app can do, and so the one that most needs
+   * taking back. "Delete everything" already asks twice; this is what catches
+   * the person who meant it and then did not.
+   */
+  const replaceAll = useCallback(
+    (next: AppData) => {
+      const had = dataRef.current;
+      const emptied =
+        next.courses.length + next.tasks.length + next.documents.length === 0 &&
+        had.courses.length + had.tasks.length + had.documents.length > 0;
+      mutate(() => next, emptied ? "Deleted everything" : "Replaced everything with a backup");
+    },
+    [mutate, dataRef],
+  );
 
   const value = useMemo<AppDataValue>(
     () => ({
@@ -398,8 +480,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
       addDocument,
       updateDocument,
       removeDocument,
+      undoable: undoable ? { label: undoable.label } : null,
+      undo,
+      dismissUndo,
     }),
     [
+      undoable, undo, dismissUndo,
       data, ready, saveError, replaceAll,
       addCourse, updateCourse, removeCourse,
       addTask, importTasks, updateTask, removeTask, setSubtasks, setSubtaskDay, toggleSubtask,

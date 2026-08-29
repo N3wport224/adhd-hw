@@ -41,8 +41,15 @@ no `.env` file — everything runs in the browser and stores its data there.
    the reading first — the clock waits.
 7. **Settings → Turn reminders on**, so something tells you it is time
    instead of waiting to be opened. Your browser will ask permission.
-8. **Settings → Download a backup** once you have anything worth keeping.
-   This device holds the only copy.
+8. **Press Ctrl/⌘ + K** and type anything — a course, an assignment, a single
+   step, a reading. **Press C** to park a stray thought from wherever you are.
+9. **Put a mark in.** When something comes back, open the course and type the
+   score into **Where you stand**. It is the one number that governs how a term
+   feels, and it is almost always kinder than the guess.
+10. **Settings → Download a backup** once you have anything worth keeping.
+    This device holds the only copy.
+11. **Install it.** In Chrome, the address bar offers to install; on a phone,
+    Add to Home Screen. After the first load it opens without a connection.
 
 ### Accessibility
 
@@ -75,7 +82,7 @@ npm run dev        # development server
 npm run build      # production build
 npm start          # serve the production build
 npm run check      # typecheck, lint and tests together
-npm test           # node:test over the pure logic — 239 cases
+npm test           # node:test over the pure logic — 287 cases
 ```
 
 ## What it does
@@ -137,6 +144,18 @@ on; month view is there for orientation. Colour is the course. Selecting a day
 opens its full list with working checkboxes, and when the visible span is
 empty it names the next day that has work rather than showing a blank grid
 that looks like a broken import.
+
+**Where you stand** — put in what came back ("17 out of 20") and each course
+says what it adds up to. A category's weight is split by how much of it has
+been handed back, so five of thirteen quizzes marked settles five thirteenths
+of the quiz weight and leaves the rest to play for — counting the whole weight
+as decided on the first quiz would read as a catastrophe every October. Set a
+target and it says what the rest of the term has to average to reach it, or
+that it is already yours, or that it is out of reach. **No letter grades**:
+every school cuts them differently and a confidently wrong B+ is worse than no
+letter. Marks are entered from the course page rather than only on the task,
+because a mark arrives days after the work was finished, by which time the
+task has moved into a collapsed "done" list.
 
 **What a piece of work is worth** — a task carries the share of the final
 grade it represents, worked out from the syllabus's own breakdown and split
@@ -207,12 +226,59 @@ done twice the app can say what it typically takes — an estimate from your own
 history rather than a number you guessed. Time blindness is the deficit; being
 asked to estimate does not fix it.
 
+**One step back** — deleting a course, a task or a document, and importing a
+backup over the top of everything, can all be undone from a banner that stays
+until the next change rather than fading after five seconds. Any other change
+clears the offer, so a stale one can never swallow newer work — and an undo
+that expires in five seconds is no use to someone who notices the mistake in
+twenty.
+
+**The run-up to an exam** — an exam is the one deadline where nothing is handed
+in, so nothing forces the work to happen early and the whole cost lands the
+night before. **Plan the run-up** lays revision sittings on the days before it,
+counted backwards from the exam rather than forwards from today, each one
+named — "first pass: read back over everything and mark what is shaky" —
+because "study" is not a next action.
+
+**"I have twenty minutes"** — today's plan can be filtered to what actually
+fits the time you have. Twenty free minutes spent reading a list of two-hour
+jobs is twenty minutes spent deciding not to start. Steps carry their expected
+cost, from their own estimate, then from what this kind of work has actually
+taken you, then from a modest guess. Nothing is deleted: the count of what
+needs longer is stated with one click back to the whole day.
+
+**The reading, where the work is** — a task can carry the documents it needs,
+reachable from the task and from inside a focus session. Getting up to find the
+chapter is where a started session ends.
+
+**It knows when you are in class** — the step planner and the week-capacity
+warning both used to treat every evening as free, which for two classes running
+5:15 to 8:00 is wrong twice a week. Neither does now: work is planned around
+class nights while there is anywhere else to put it, and taken from them rather
+than dropped when a deadline leaves no choice.
+
+**Getting back after a bad week** — steps that slipped keep their old day for
+ever, and a plan pointing at days you failed on is the most reliable way to
+make someone close an app for good. **Re-spread from today** shows exactly what
+would move before anything does, then gives it days that have not happened yet
+— around the class nights, within each task's own deadline. Nothing is deleted
+or hidden. The size is stated out loud because a number you can look at is
+smaller than a pile you are avoiding.
+
 **Knowing what a week holds** — the Focus page says when the rest of the week
 is more planned work than the evenings left can hold, and sums up what the
 last seven days actually produced. The planner used to spread steps without
 ever saying "this is too much", which quietly confirmed an underestimate; and
 nothing said what a week had produced, which matters because the feeling on a
 Friday evening is "I got nothing done" almost regardless of what happened.
+
+**Search and capture** — **Ctrl/⌘ + K** searches courses, assignments, single
+steps and readings at once; **C** anywhere parks a stray thought as an unfiled
+task with no course and no date. Both were missing for the same reason:
+everything the app could do required already being in the right place.
+Remembering where a thing lives is not a reasonable thing to ask of the person
+this app is for, and asking which course a thought belongs to, at the moment
+someone is trying to get it out of their head, is how the thought is lost.
 
 **Reminders** — the one part of the app that speaks first. Everything else is
 pull: it works only if you remember to open it, which is asking exactly what
@@ -243,6 +309,7 @@ time with the arrows and a week at a time with up and down.
 
 ```
 adhd-hw/
+├── public/                             # manifest, icons, offline worker
 └── src/
     ├── app/
     │   ├── layout.tsx                  # providers + AppShell
@@ -255,7 +322,9 @@ adhd-hw/
     │   └── tasks/page.tsx
     ├── components/
     │   ├── layout/                     # AppShell, Sidebar, TopBar, drawer,
-    │   │                               #   ThemeToggle, SaveErrorBanner
+    │   │                               #   ThemeToggle, SaveErrorBanner,
+    │   │                               #   CommandPalette, UndoBanner,
+    │   │                               #   ReminderWatch, ServiceWorker
     │   ├── courses/                    # CourseCard/Detail/FormDialog/Grid/Icon,
     │   │                               #   GradingBreakdown, LecturePlanner
     │   ├── syllabus/                   # SyllabusScanner, SyllabusReviewModal
@@ -290,6 +359,12 @@ adhd-hw/
     │   ├── weekLoad.ts                 # the week ahead, and the week behind
     │   ├── taskWeight.ts               # what a task is worth of the final grade
     │   ├── reminders.ts                # class and evening notifications
+    │   ├── grades.ts                   # what is banked, settled, and still to play for
+    │   ├── catchUp.ts                  # re-dating what slipped
+    │   ├── examPlan.ts                 # revision sittings before an exam
+    │   ├── search.ts                   # one query over everything
+    │   ├── timeAvailable.ts            # what fits the time you have
+    │   ├── palette.ts                  # opening the palette from anywhere
     │   ├── useFocusTrap.ts             # focus handling shared by every overlay
     │   ├── documents/extract.ts        # PDF / DOCX / text extraction
     │   ├── documents/blocks.ts         # headings, lists and quotes from each format
@@ -449,6 +524,14 @@ A few decisions worth knowing before extending this:
   work of the same kind fall in the same fortnight and only one was written
   with a real date, the unsure one is lost — the review step shows what
   survived, and anything missing can be added by hand.
+- **Grades are only as good as what the syllabus said.** A task is matched to
+  a grading category by the words they share — "Quiz 7" to "Quizzes" — and
+  anything the parser could not place is left out of the standing rather than
+  guessed into it. A course with no breakdown gets no standing at all.
+- **Offline covers the app, not a fresh install.** The service worker caches
+  the shell after the first visit, so it opens on a dead connection; a browser
+  that has never loaded it still needs the network once. It does not do push —
+  push needs a server, and this app has none on purpose.
 - **There is no sync and no account.** Data lives in one browser on one
   device. The backup file is the only way to move it or keep it safe.
 - **Class meetings appear in week view only.** Three classes meeting three
@@ -474,4 +557,7 @@ A few decisions worth knowing before extending this:
    tasks rather than one — the way a term of lectures already does.
 2. Separate lab and section times per course.
 3. A Supabase `DataStore` adapter plus auth, so data follows the student
-   across devices.
+   across devices — and with it, real push, which is the only way a reminder
+   reaches a closed browser.
+4. Kept reader notes feeding the run-up to an exam: the sentences you stopped
+   on while reading are the ones worth seeing again the week before.

@@ -32,9 +32,13 @@ export function useFocusTrap(
     if (!open) return;
 
     const opener = document.activeElement as HTMLElement | null;
+    // `button` and `a[href]` match regardless of tabindex, so an element
+    // deliberately taken out of the tab order still came back as a stop. The
+    // trap then thought focus was mid-list and let Tab fall straight out of
+    // the overlay to the skip link behind it.
     const focusables = () =>
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
-        isVisible,
+        (element) => isVisible(element) && element.tabIndex >= 0,
       );
 
     focusables()[0]?.focus();
@@ -78,7 +82,14 @@ export function useFocusTrap(
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = previousOverflow;
 
-      if (opener && document.contains(opener) && isVisible(opener)) opener.focus();
+      // `<body>` counts as no opener at all. An overlay opened by a keyboard
+      // shortcut rather than a button has body as the active element, and
+      // handing focus back to it drops a keyboard user at the top of the
+      // document with nothing to show where they are — the exact failure the
+      // fallback exists to prevent.
+      const usable =
+        opener && opener !== document.body && document.contains(opener) && isVisible(opener);
+      if (usable) opener.focus();
       else document.getElementById(FALLBACK)?.focus();
     };
   }, [open, onClose, containerRef]);
